@@ -1,0 +1,10 @@
+[package]
+name = "zero-hal"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Type-safe hardware abstraction traits for GPIO, UART, SPI, and I2C"
+
+[dependencies]
+zero-core = { path = "../zero-core" }

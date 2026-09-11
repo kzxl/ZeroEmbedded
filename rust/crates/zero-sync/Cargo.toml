@@ -1,0 +1,10 @@
+[package]
+name = "zero-sync"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Concurrency and interrupt-safe synchronization primitives for bare-metal MCU"
+
+[dependencies]
+zero-core = { path = "../zero-core" }

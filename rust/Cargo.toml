@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/zero-core",
+    "crates/zero-memory",
+    "crates/zero-sync",
+    "crates/zero-hal",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Phong Võ <kzxl>"]
+license = "MIT"
+repository = "https://github.com/kzxl/ZeroEmbedded"
+
+[profile.release]
+opt-level = "s"      # Optimize for binary size on embedded targets
+lto = true           # Link-Time Optimization across C & Rust
+codegen-units = 1
+panic = "abort"      # Zero overhead panic handler for no_std
+debug = true

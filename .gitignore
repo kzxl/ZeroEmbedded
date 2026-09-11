@@ -1,0 +1,31 @@
+# Build outputs
+target/
+build/
+bin/
+obj/
+out/
+
+# C / C++ artifacts
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.elf
+*.bin
+*.hex
+*.map
+
+# Tooling & IDE
+.vscode/
+.idea/
+*.swp
+*~
+compile_commands.json
+.clangd/
+
+# Rust artifacts
+**/*.rs.bk
+Cargo.lock

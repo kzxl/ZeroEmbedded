@@ -1,0 +1,10 @@
+[package]
+name = "zero-memory"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Zero-allocation memory pools, static buffers, and arena allocators"
+
+[dependencies]
+zero-core = { path = "../zero-core" }

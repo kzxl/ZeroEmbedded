@@ -1,0 +1,12 @@
+[package]
+name = "zero-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Core primitive abstractions and C ABI FFI bridges for ZeroEmbedded"
+
+[dependencies]
+
+[lib]
+crate-type = ["rlib", "staticlib"]
