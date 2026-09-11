@@ -4,6 +4,7 @@ build/
 bin/
 obj/
 out/
+dist/
 
 # C / C++ artifacts
 *.o

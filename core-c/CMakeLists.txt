@@ -52,3 +52,46 @@ elseif(MSVC)
         /O2
     )
 endif()
+
+# ==============================================================================
+# Installation & CMake Export Configuration
+# ==============================================================================
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+install(TARGETS zero_core_c
+    EXPORT ZeroEmbeddedTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(DIRECTORY include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h"
+)
+
+install(EXPORT ZeroEmbeddedTargets
+    FILE ZeroEmbeddedTargets.cmake
+    NAMESPACE Zero::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ZeroEmbedded
+)
+
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/ZeroEmbeddedConfigVersion.cmake"
+    VERSION 0.7.0
+    COMPATIBILITY SameMajorVersion
+)
+
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ZeroEmbeddedConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/ZeroEmbeddedConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ZeroEmbedded
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/ZeroEmbeddedConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/ZeroEmbeddedConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ZeroEmbedded
+)

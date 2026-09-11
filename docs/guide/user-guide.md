@@ -13,34 +13,107 @@
 
 ---
 
-## 2. Integration into Firmware Projects
+## 2. Integration & Packaging Distribution Methods
 
-### Option A: CMake Integration (Recommended for VS Code, CLion, Zephyr, and CI)
+ZeroEmbedded provides 5 official consumption methods, eliminating the need to manually clone or manage source code:
 
-Add ZeroEmbedded to your project repository (as a submodule or subdirectory):
+### Option A: PlatformIO Registry / Git Dependency (`platformio.ini`)
 
-```cmake
-cmake_minimum_required(VERSION 3.15)
-project(my_firmware LANGUAGES C)
+ZeroEmbedded includes a native `library.json` specification. Add it to your `platformio.ini` directly from GitHub or PlatformIO Registry:
 
-# 1. Add ZeroEmbedded C Core Foundation
-add_subdirectory(path/to/ZeroEmbedded/core-c zero_embedded)
-
-# 2. Link against your firmware binary
-add_executable(my_firmware src/main.c)
-target_link_libraries(my_firmware PRIVATE Zero::core_c)
+```ini
+[env:stm32f401cc]
+platform = ststm32
+board = blackpill_f401cc
+framework = stm32cube
+lib_deps =
+    https://github.com/ZeroUniverse/ZeroEmbedded.git#v0.7.0
 ```
 
-### Option B: Drop-In Source Integration (Keil MDK, STM32CubeIDE, IAR, PlatformIO)
+PlatformIO will automatically resolve `core-c/include` and `core-c/src`, compile static objects, and make `#include "zero/zero.h"` available across your firmware.
 
-1. **Include Search Path**: Add `core-c/include` to your IDE's compiler include directories.
-2. **Source Files**: Add the following files from `core-c/src/` to your project build group:
-   - Memory primitives: `pool.c`, `arena.c`, `buffer.c`, `assert.c`
-   - Concurrency & Queue: `spsc.c`, `tasklet.c`
-   - Protocol framing: `zerowire.c`
-   - Hardware Abstraction: `gpio.c`, `timer.c`, `uart.c`
-   - RTOS fallback: `rtos_baremetal.c` (if running bare-metal without FreeRTOS)
-3. **Master Header**: Include the umbrella header anywhere in your C code:
+---
+
+### Option B: Modern CMake via `FetchContent` (Zero Git Submodules Required)
+
+Modern CMake projects (Zephyr, ESP-IDF, STM32CubeIDE CMake, CLion, VS Code) can fetch and configure ZeroEmbedded automatically during build time:
+
+```cmake
+cmake_minimum_required(VERSION 3.16)
+project(my_firmware LANGUAGES C)
+
+include(FetchContent)
+FetchContent_Declare(
+    ZeroEmbedded
+    GIT_REPOSITORY https://github.com/ZeroUniverse/ZeroEmbedded.git
+    GIT_TAG        v0.7.0
+    SOURCE_SUBDIR  core-c
+)
+FetchContent_MakeAvailable(ZeroEmbedded)
+
+add_executable(my_firmware src/main.c)
+target_link_libraries(my_firmware PRIVATE ZeroEmbedded::core_c)
+```
+
+---
+
+### Option C: Pre-Installed System CMake Package (`find_package`)
+
+If ZeroEmbedded has been installed via CI or toolchain sysroot (`cmake --install build --prefix /opt/arm-sysroot`):
+
+```cmake
+cmake_minimum_required(VERSION 3.16)
+project(my_firmware LANGUAGES C)
+
+find_package(ZeroEmbedded 0.7.0 REQUIRED)
+
+add_executable(my_firmware src/main.c)
+target_link_libraries(my_firmware PRIVATE ZeroEmbedded::core_c)
+```
+
+The exported target `ZeroEmbedded::core_c` automatically configures compiler include paths (`-I<prefix>/include`) and static library linkage.
+
+---
+
+### Option D: ARM CMSIS-Pack (Keil MDK, STM32CubeIDE, IAR, CMSIS-Toolbox)
+
+ZeroEmbedded includes a standard `ZeroEmbedded.pdsc` descriptor.
+
+1. **CMSIS-Toolbox / cpackget**:
+   ```bash
+   cpackget add ZeroEmbedded.pdsc
+   ```
+2. **Keil MDK Pack Installer**:
+   - Open **Pack Installer** -> **File** -> **Import...** -> Select `ZeroEmbedded.pdsc`.
+   - In **Manage Run-Time Environment (RTE)**, expand `Framework` -> `ZeroEmbedded` and check:
+     - `[X] Core` (Memory pools, linear arena, SPSC, tasklet, FSM)
+     - `[X] Observability` (Binary logger, DWT cycle counter, Crash dump)
+     - `[X] Storage` (Wear-leveling NVS, dual-bank OTA)
+     - `[X] Crypto` (Zero-heap SHA-256, ChaCha20)
+     - `[X] DSP` (EMA / Median-3 filters, debouncers)
+
+---
+
+### Option E: Standalone Pure C Drop-In SDK (`ZeroEmbedded-v0.7.0.zip`)
+
+For legacy toolchains or air-gapped engineering environments, ZeroEmbedded generates a clean, standalone SDK archive containing only headers, sources, and a turnkey `CMakeLists.txt` (no tests, no benchmarks, ~60 KB total):
+
+1. Generate or download `dist/ZeroEmbedded-v0.7.0.zip`:
+   ```bash
+   python scripts/package_dist.py
+   ```
+2. Unzip into your firmware project directory:
+   ```
+   my_project/
+   ├── drivers/
+   ├── src/main.c
+   └── ZeroEmbedded/
+       ├── include/zero/
+       ├── src/
+       └── CMakeLists.txt
+   ```
+3. In CMake: `add_subdirectory(ZeroEmbedded)` & `target_link_libraries(app PRIVATE ZeroEmbedded::core_c)`.
+4. In Eclipse / Keil: Add `ZeroEmbedded/include` to Include Paths and `ZeroEmbedded/src/*.c` to Project Files. Include master header:
    ```c
    #include "zero/zero.h"
    ```

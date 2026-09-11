@@ -1,0 +1,43 @@
+{
+  "name": "ZeroEmbedded",
+  "version": "0.7.0",
+  "description": "Enterprise-grade sovereign deterministic embedded micro-framework for ARM Cortex-M, RISC-V, and bare-metal MCUs with strictly zero dynamic heap.",
+  "keywords": [
+    "embedded",
+    "firmware",
+    "c11",
+    "stm32",
+    "arm",
+    "cortex-m",
+    "riscv",
+    "zero-heap",
+    "deterministic",
+    "watchdog",
+    "fsm",
+    "nvs",
+    "ota",
+    "crypto",
+    "real-time"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kzxl/ZeroEmbedded.git"
+  },
+  "authors": [
+    {
+      "name": "ZeroUniverse Team",
+      "maintainer": true
+    }
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/kzxl/ZeroEmbedded",
+  "frameworks": ["*"],
+  "platforms": ["*"],
+  "build": {
+    "srcDir": "core-c/src",
+    "includeDir": "core-c/include",
+    "flags": [
+      "-Icore-c/include"
+    ]
+  }
+}

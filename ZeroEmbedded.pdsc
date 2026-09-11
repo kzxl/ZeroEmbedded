@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package schemaVersion="1.7.2" xmlns:xs="http://www.w3.org/2001/XMLSchema-instance" xs:noNamespaceSchemaLocation="PACK.xsd">
+  <vendor>ZeroUniverse</vendor>
+  <name>ZeroEmbedded</name>
+  <description>Zero-allocation, deterministic embedded C framework for safety-critical MCUs</description>
+  <url>https://github.com/ZeroUniverse/ZeroEmbedded</url>
+  <supportContact>https://github.com/ZeroUniverse/ZeroEmbedded/issues</supportContact>
+  <license>LICENSE</license>
+
+  <releases>
+    <release version="0.7.0" date="2026-09-11">
+      Release 0.7.0: Lock-free binary logging, crypto (SHA-256, ChaCha20), DSP filters, crash dump, OTA, and full packaging support.
+    </release>
+  </releases>
+
+  <keywords>
+    <keyword>Embedded</keyword>
+    <keyword>Zero Allocation</keyword>
+    <keyword>Deterministic</keyword>
+    <keyword>DSP</keyword>
+    <keyword>Crypto</keyword>
+    <keyword>Observability</keyword>
+    <keyword>RTOS Abstraction</keyword>
+    <keyword>Safety-Critical</keyword>
+  </keywords>
+
+  <components>
+    <component Cclass="Framework" Cgroup="ZeroEmbedded" Csub="Core" Cversion="0.7.0">
+      <description>ZeroEmbedded Core C Library - Static allocation, FSM, Tasklet, Sync, and Memory</description>
+      <files>
+        <file category="include" name="core-c/include/"/>
+        <file category="source"  name="core-c/src/arena.c"/>
+        <file category="source"  name="core-c/src/buffer.c"/>
+        <file category="source"  name="core-c/src/pool.c"/>
+        <file category="source"  name="core-c/src/fsm.c"/>
+        <file category="source"  name="core-c/src/spsc.c"/>
+        <file category="source"  name="core-c/src/tasklet.c"/>
+        <file category="source"  name="core-c/src/dispatcher.c"/>
+        <file category="source"  name="core-c/src/zerowire.c"/>
+      </files>
+    </component>
+
+    <component Cclass="Framework" Cgroup="ZeroEmbedded" Csub="Observability" Cversion="0.7.0">
+      <description>Deferred binary logger, DWT cycle counter, and crash dump telemetry</description>
+      <files>
+        <file category="include" name="core-c/include/"/>
+        <file category="source"  name="core-c/src/log.c"/>
+        <file category="source"  name="core-c/src/dwt.c"/>
+        <file category="source"  name="core-c/src/crash_dump.c"/>
+      </files>
+    </component>
+
+    <component Cclass="Framework" Cgroup="ZeroEmbedded" Csub="Storage" Cversion="0.7.0">
+      <description>Wear-leveling Non-Volatile Storage (NVS) and A/B dual-bank OTA</description>
+      <files>
+        <file category="include" name="core-c/include/"/>
+        <file category="source"  name="core-c/src/nvs.c"/>
+        <file category="source"  name="core-c/src/ota.c"/>
+      </files>
+    </component>
+
+    <component Cclass="Framework" Cgroup="ZeroEmbedded" Csub="DSP" Cversion="0.7.0">
+      <description>Single-pole IIR low-pass and fixed-point moving average filters</description>
+      <files>
+        <file category="include" name="core-c/include/"/>
+        <file category="source"  name="core-c/src/filter.c"/>
+      </files>
+    </component>
+
+    <component Cclass="Framework" Cgroup="ZeroEmbedded" Csub="Crypto" Cversion="0.7.0">
+      <description>Zero-heap SHA-256 cryptographic hash and ChaCha20 stream cipher</description>
+      <files>
+        <file category="include" name="core-c/include/"/>
+        <file category="source"  name="core-c/src/sha256.c"/>
+        <file category="source"  name="core-c/src/chacha20.c"/>
+      </files>
+    </component>
+
+    <component Cclass="Framework" Cgroup="ZeroEmbedded" Csub="HAL-RTOS" Cversion="0.7.0">
+      <description>Power management state machine and OSAL abstraction</description>
+      <files>
+        <file category="include" name="core-c/include/"/>
+        <file category="source"  name="core-c/src/power.c"/>
+        <file category="source"  name="core-c/src/rtos.c"/>
+      </files>
+    </component>
+  </components>
+</package>
