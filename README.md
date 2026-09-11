@@ -11,12 +11,14 @@
 
 ---
 
-## 🏛️ Core Architectural Principles
+## 🏛️ Architecture & System Structure
 
-- **Rule 1 — C is the Compatibility Layer**: Vendor SDKs (ST HAL, NXP SDK, ESP-IDF) and existing legacy firmware compile directly without code rewrites or custom compiler forks.
-- **Rule 2 — Rust is the Safety Island**: Strategic deployment of Rust for memory-sensitive algorithms, communication protocols, concurrency state machines, and type-state peripheral drivers.
-- **Rule 3 — Zero-Cost First, Runtime Safety Fallback**: Compile-time static analysis and type invariants eliminate overhead. Abstractions compile down to raw register assembly identical to hand-written C (`-O2` / `-O3`).
-- **Rule 4 — C ABI (`extern "C"`) is the Strict Boundary**: No leaky abstractions across language boundaries; high-frequency execution loops never cross the FFI bridge.
+ZeroEmbedded is engineered around a sovereign dual-tier foundation:
+- **C Foundation Tier (`core-c/`)**: Zero-cost primitives, $O(1)$ bitmap memory pools, linear arenas, lock-free SPSC queues, and the ZeroWire framing engine.
+- **Rust Safety Tier (`rust/`)**: Strictly `#![no_std]` crates providing Type-State peripheral drivers (`zero-hal`) and compile-time DMA ownership tokens.
+- **Static Tooling & Verification (`tooling/`)**: Clang AST analyzers enforcing context safety in ISR/DMA routines at CI time without runtime overhead.
+
+👉 **[Read the Complete Embedded Architecture & Safety Invariants Specification](docs/architect/embedded-architecture.md)**
 
 ---
 
@@ -50,59 +52,6 @@ buffer.obj: 1.1 KB  |  assert.obj: 1.2 KB  |  pool.obj: 1.9 KB
 arena.obj:  2.5 KB  |  spsc.obj:   2.5 KB  |  zerowire.obj: 2.7 KB
 ```
 *Total compiled Flash footprint for the entire Core C Foundation is **under 12 KB**, shrinking to **3–4 KB** with `-Os` and LTO on ARM Cortex-M targets.*
-
----
-
-## 📦 Subsystems & Architecture Layout
-
-```text
-ZeroEmbedded/
-├── core-c/                  # C Foundation Tier (Zero-cost primitives & memory engines)
-│   ├── CMakeLists.txt       # Unified CMake build script
-│   ├── include/zero/
-│   │   ├── zero.h           # Master umbrella header
-│   │   ├── types.h          # Fixed-width types, fw_size_t, fw_bool_t
-│   │   ├── result.h         # fw_status_t, error codes, FW_CHECK() macro
-│   │   ├── span.h           # fw_span_t, fw_cspan_t, fw_span_sub_safe()
-│   │   ├── string_view.h    # fw_string_view_t (Zero-allocation string slice)
-│   │   ├── assert.h         # FW_STATIC_ASSERT, FW_ASSERT, panic hooks
-│   │   ├── attributes.h     # FW_INLINE, FW_MEMORY_BARRIER, FW_ISR, FW_DMA, FW_OWNER
-│   │   ├── memory/          # pool.h, arena.h, buffer.h
-│   │   ├── sync/            # spsc.h (Lock-free single-producer single-consumer)
-│   │   ├── hal/             # gpio.h, uart.h, timer.h
-│   │   ├── protocol/        # zerowire.h (Binary framing & stream resynchronization)
-│   │   └── rtos/            # rtos.h (Unified RTOS abstraction)
-│   └── src/                 # pool.c, arena.c, buffer.c, spsc.c, zerowire.c, assert.c
-│
-├── rust/                    # Rust Safety Tier (Cargo Workspace, strictly #![no_std])
-│   ├── Cargo.toml           # Release profile: opt-level = "s", lto = true
-│   └── crates/
-│       ├── zero-core/       # FwSpan, FwStatus, and safe ZeroWire protocol engine
-│       ├── zero-hal/        # Type-State GPIO (Pin<Input>, Pin<Output>) & DMA Ownership Tokens
-│       ├── zero-sync/       # SpscQueue<T, N> lock-free ringbuffer & SpinLockFlag
-│       └── zero-memory/     # StaticBuffer<N> & pool abstractions
-│
-├── tooling/                 # Development & Verification Tooling
-│   ├── analyzer/            # zero_analyzer.py (Context & ISR safety analysis)
-│   └── codegen/             # svd_codegen.py (CMSIS-SVD peripheral register generator)
-│
-├── hal/                     # Auto-generated hardware register maps (hw_gpioa.h)
-├── rtos/                    # Bare-metal, FreeRTOS, and Zephyr adapters
-├── benchmarks/              # Comprehensive performance benchmark suite
-├── tests/                   # 114 Unit, Concurrency, and Safety Tests (100% Pass)
-└── examples/stm32_poc/      # End-to-end verified firmware PoC
-```
-
----
-
-## 🛡️ Key Safety Invariants & Technical Highlights
-
-1. **Bitmap Double-Free Elimination**: Memory pools incorporate an internal O(1) bitset tracker. Freeing an already-freed pointer returns `FW_ERR_INVALID_ARG` immediately, making list cycle corruption mathematically impossible.
-2. **Hardware Memory Barriers**: Atomic acquire/release fences (`FW_MEMORY_BARRIER`) protect lockless SPSC queues, preventing out-of-order write buffer hazards on ARM Cortex-M7 and dual-core MCUs (ESP32, RP2040).
-3. **Type-State Peripheral Drivers**: Hardware pins are generic types (`Pin<Input>`, `Pin<Output>`). State transitions consume the previous handle, eliminating illegal mode operations at compile time.
-4. **DMA Ownership Tokens**: Buffer ownership moves into `DmaTransfer<BUF>` during asynchronous transfers, making stack-use-after-free physically impossible to write.
-5. **Stream Resynchronization**: The ZeroWire protocol engine features sliding window SOF detection (`fw_zerowire_stream_sync`), recovering valid packets across noisy serial channels.
-6. **Execution Context Verification**: The `zero_analyzer.py` tool scans annotations (`FW_ISR`, `FW_DMA`), catching illegal heap allocations (`malloc`) or blocking calls (`delay_ms`) inside interrupt handlers.
 
 ---
 
