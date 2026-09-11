@@ -17,9 +17,15 @@
 #include "memory/arena.h"
 #include "memory/buffer.h"
 #include "sync/spsc.h"
+#include "tasklet.h"
+#include "hal/gpio.h"
+#include "hal/uart.h"
+#include "hal/timer.h"
+#include "protocol/zerowire.h"
+#include "rtos/rtos.h"
 
 #define ZERO_EMBEDDED_VERSION_MAJOR 0
-#define ZERO_EMBEDDED_VERSION_MINOR 1
+#define ZERO_EMBEDDED_VERSION_MINOR 2
 #define ZERO_EMBEDDED_VERSION_PATCH 0
 
 #endif /* ZERO_H */

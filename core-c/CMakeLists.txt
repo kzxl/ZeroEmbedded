@@ -11,10 +11,18 @@ add_library(zero_core_c STATIC
     src/buffer.c
     src/spsc.c
     src/zerowire.c
+    src/timer.c
+    src/gpio.c
+    src/uart.c
+    src/tasklet.c
+    src/rtos_baremetal.c
 )
 
+add_library(Zero::core_c ALIAS zero_core_c)
+
 target_include_directories(zero_core_c PUBLIC
-    include
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
 )
 
 # Compiler optimization warnings & flags

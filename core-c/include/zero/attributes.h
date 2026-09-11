@@ -22,7 +22,11 @@
     #define FW_UNLIKELY(x) __builtin_expect(!!(x), 0)
     #define FW_UNREACHABLE() __builtin_unreachable()
     #define FW_COMPILER_BARRIER() __asm__ __volatile__("" ::: "memory")
-    #define FW_MEMORY_BARRIER() __sync_synchronize()
+    #if defined(__arm__) || defined(__thumb__)
+        #define FW_MEMORY_BARRIER()   __asm__ __volatile__("dmb 0xF" ::: "memory")
+    #else
+        #define FW_MEMORY_BARRIER()   __sync_synchronize()
+    #endif
 #elif defined(_MSC_VER)
     #define FW_INLINE static __inline
     #define FW_ALWAYS_INLINE static __forceinline
@@ -34,11 +38,24 @@
     #define FW_LIKELY(x) (x)
     #define FW_UNLIKELY(x) (x)
     #define FW_UNREACHABLE() __assume(0)
-    #define FW_COMPILER_BARRIER() do { \
-        extern void _ReadWriteBarrier(void); \
-        _ReadWriteBarrier(); \
-    } while(0)
-    #define FW_MEMORY_BARRIER() FW_COMPILER_BARRIER()
+    #if defined(_M_X64) || defined(_M_IX86) || defined(_M_ARM) || defined(_M_ARM64)
+        #ifdef __cplusplus
+        extern "C" {
+        #endif
+        long _InterlockedOr(long volatile *Target, long Value);
+        #ifdef __cplusplus
+        }
+        #endif
+        #pragma intrinsic(_InterlockedOr)
+        #define FW_COMPILER_BARRIER() _ReadWriteBarrier()
+        #define FW_MEMORY_BARRIER() do { \
+            volatile long _fence_dummy = 0; \
+            _InterlockedOr(&_fence_dummy, 0); \
+        } while(0)
+    #else
+        #define FW_COMPILER_BARRIER() do {} while(0)
+        #define FW_MEMORY_BARRIER()   do {} while(0)
+    #endif
 #else
     #define FW_INLINE static inline
     #define FW_ALWAYS_INLINE static inline

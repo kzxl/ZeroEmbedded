@@ -49,6 +49,7 @@ def analyze_c_file(file_path: str) -> list[Diagnostic]:
         lines = f.readlines()
 
     in_isr_function = False
+    has_opened_brace = False
     current_isr_name = ""
     brace_depth = 0
 
@@ -62,12 +63,16 @@ def analyze_c_file(file_path: str) -> list[Diagnostic]:
         isr_match = isr_decl_regex.search(line)
         if isr_match:
             in_isr_function = True
+            has_opened_brace = False
             current_isr_name = isr_match.group(1)
             brace_depth = 0
 
         if in_isr_function:
-            brace_depth += line.count("{")
-            brace_depth -= line.count("}")
+            open_count = line.count("{")
+            close_count = line.count("}")
+            if open_count > 0:
+                has_opened_brace = True
+            brace_depth += open_count - close_count
 
             # Check forbidden function calls inside ISR
             for match in call_regex.finditer(line):
@@ -83,8 +88,9 @@ def analyze_c_file(file_path: str) -> list[Diagnostic]:
                         message=f"{detail} (in ISR '{current_isr_name}')"
                     ))
 
-            if brace_depth <= 0 and "{" in "".join(lines[max(0, idx-5):idx]):
+            if has_opened_brace and brace_depth <= 0:
                 in_isr_function = False
+                has_opened_brace = False
                 current_isr_name = ""
 
     return diagnostics

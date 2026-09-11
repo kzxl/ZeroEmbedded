@@ -57,28 +57,36 @@ arena.obj:  2.5 KB  |  spsc.obj:   2.5 KB  |  zerowire.obj: 2.7 KB
 
 ## 🚀 Quick Start
 
-### 1. Build and Run Hardened Test Suite (138 Tests)
-```bash
-# Using MSVC Developer Command Prompt
-cl /nologo /W4 /WX /O2 /I core-c/include core-c/src/*.c tests/test_core_memory.c /Fe:test_hardened.exe
-.\test_hardened.exe
+### 1. One-Step Automated Build & Verification
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/build_and_test.ps1
 ```
 
-### 2. Run Static Context Analyzer
+### 2. Standard CMake & CTest Workflow
 ```bash
-python tooling/analyzer/zero_analyzer.py core-c examples/stm32_poc
+# Configure and build all targets (core library, tests, benchmarks, examples)
+cmake -B build -S .
+cmake --build build --config Release
+
+# Run hardened test suite (Core Memory + HAL & Tasklet Tests)
+ctest --test-dir build -C Release --output-on-failure
 ```
 
-### 3. Run Benchmark Suite
+### 3. Run Static Context Analyzer (Zero Violation Discipline)
 ```bash
-cl /nologo /W4 /O2 /I core-c/include core-c/src/*.c benchmarks/bench_suite.c /Fe:bench_suite.exe
-.\bench_suite.exe
+python tooling/analyzer/zero_analyzer.py core-c examples
 ```
 
-### 4. Run STM32 PoC Firmware Demonstration
+### 4. Run Demonstrations
 ```bash
-cl /nologo /W4 /O2 /I core-c/include core-c/src/*.c examples/stm32_poc/main.c /Fe:poc.exe
-.\poc.exe
+# Host Simulator (Virtual GPIO, UART Loopback, and Tasklet Dispatcher)
+.\build\Release\example_host_sim.exe
+
+# STM32 MCU Target PoC
+.\build\Release\example_stm32_poc.exe
+
+# Performance Benchmark Suite (with HEPM logging)
+.\build\Release\bench_suite.exe
 ```
 
 ---
