@@ -7,6 +7,9 @@
 
 use core::ffi::c_void;
 
+pub mod protocol;
+pub use protocol::{RustZerowireFrame, encode_frame, decode_frame};
+
 /// C-ABI compatible status code matching `fw_status_t`
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -6,6 +6,12 @@
 
 use zero_core::FwStatus;
 
+pub mod gpio;
+pub mod dma;
+
+pub use gpio::{Pin, Input, Output, Alternate, Analog};
+pub use dma::{DmaChannel, DmaTransfer};
+
 /// Generic digital output pin
 pub trait OutputPin {
     fn set_high(&mut self) -> Result<(), FwStatus>;
