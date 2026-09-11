@@ -72,14 +72,28 @@ fw_status_t fw_pool_init(
     pool->free_count = capacity;
     pool->free_list = FW_NULL;
 
-    /* Build intrusive free list linking each block to the next */
+    /* Calculate power-of-2 shift for zero-cost bitwise indexing */
+    pool->block_shift = 0;
+    if ((aligned_block_size & (aligned_block_size - 1)) == 0) {
+        uint8_t shift = 0;
+        fw_size_t temp = aligned_block_size;
+        while (temp > 1) {
+            temp >>= 1;
+            shift++;
+        }
+        pool->block_shift = shift;
+    }
+
+    /* Build intrusive free list linking each block forward (cache prefetcher friendly) */
+    fw_pool_node_t **link = &pool->free_list;
     uint8_t *curr = (uint8_t*)pool->storage;
     for (fw_size_t i = 0; i < capacity; ++i) {
         fw_pool_node_t *node = (fw_pool_node_t*)curr;
-        node->next = pool->free_list;
-        pool->free_list = node;
+        *link = node;
+        link = &node->next;
         curr += aligned_block_size;
     }
+    *link = FW_NULL;
 
     return FW_OK;
 }
@@ -93,8 +107,9 @@ void* fw_pool_alloc(fw_pool_t *pool) {
     pool->free_list = node->next;
     pool->free_count--;
 
-    fw_size_t idx = (fw_size_t)(((uintptr_t)node - (uintptr_t)pool->storage) / pool->block_size);
-    pool->alloc_bitmap[idx / 32] |= (1U << (idx % 32));
+    fw_size_t offset = (fw_size_t)((uintptr_t)node - (uintptr_t)pool->storage);
+    fw_size_t idx = (pool->block_shift > 0) ? (offset >> pool->block_shift) : (offset / pool->block_size);
+    pool->alloc_bitmap[idx >> 5] |= (1U << (idx & 31));
 
     return (void*)node;
 }
@@ -108,26 +123,35 @@ fw_status_t fw_pool_free(fw_pool_t *pool, void *block) {
     uintptr_t s_addr = (uintptr_t)pool->storage;
     uintptr_t e_addr = s_addr + pool->storage_size;
 
-    /* Range and alignment validation */
+    /* Range validation */
     if (b_addr < s_addr || b_addr >= e_addr) {
         return FW_ERR_INVALID_ARG;
     }
 
     fw_size_t offset = (fw_size_t)(b_addr - s_addr);
-    if ((offset % pool->block_size) != 0) {
-        return FW_ERR_INVALID_ARG;
+
+    /* Alignment validation (Fast-path bitwise mask if power-of-2) */
+    if (pool->block_shift > 0) {
+        if ((offset & (((fw_size_t)1 << pool->block_shift) - 1)) != 0) {
+            return FW_ERR_INVALID_ARG;
+        }
+    } else {
+        if ((offset % pool->block_size) != 0) {
+            return FW_ERR_INVALID_ARG;
+        }
     }
 
-    fw_size_t idx = offset / pool->block_size;
-    uint32_t mask = 1U << (idx % 32);
+    fw_size_t idx = (pool->block_shift > 0) ? (offset >> pool->block_shift) : (offset / pool->block_size);
+    uint32_t mask = 1U << (idx & 31);
+    fw_size_t word_idx = idx >> 5;
 
     /* Double-Free Check: block must be currently marked as allocated */
-    if ((pool->alloc_bitmap[idx / 32] & mask) == 0) {
+    if ((pool->alloc_bitmap[word_idx] & mask) == 0) {
         return FW_ERR_INVALID_ARG; /* REJECT DOUBLE FREE */
     }
 
     /* Mark block as free in bitmap */
-    pool->alloc_bitmap[idx / 32] &= ~mask;
+    pool->alloc_bitmap[word_idx] &= ~mask;
 
 #if ZERO_ENABLE_ASSERT
     /* Poison memory in debug builds to immediately catch Use-After-Free */

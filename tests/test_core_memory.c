@@ -63,6 +63,26 @@ static fw_status_t test_span_and_string_view(void) {
     TEST_ASSERT(!fw_sv_equals(sv1, sv3), "Different strings must not equal");
     TEST_ASSERT(sv1.length == 12, "Length must be 12");
 
+    /* Test fw_sv_starts_with and fw_sv_sub */
+    fw_string_view_t prefix = FW_SV_LITERAL("Zero");
+    TEST_ASSERT(fw_sv_starts_with(sv1, prefix), "sv1 starts with 'Zero'");
+    TEST_ASSERT(!fw_sv_starts_with(sv1, FW_SV_LITERAL("Embedded")), "sv1 does not start with 'Embedded'");
+    
+    fw_string_view_t sub_sv = fw_sv_sub(sv1, 4, 8);
+    TEST_ASSERT(fw_sv_equals(sub_sv, FW_SV_LITERAL("Embedded")), "fw_sv_sub slice matches 'Embedded'");
+
+    /* Test fw_span_fill and fw_span_copy */
+    uint8_t copy_dst[16] = {0};
+    fw_span_t dst_span = FW_SPAN_FROM_ARRAY(copy_dst);
+    fw_span_fill(dst_span, 0xAA);
+    TEST_ASSERT(copy_dst[0] == 0xAA && copy_dst[15] == 0xAA, "fw_span_fill fills memory");
+
+    uint8_t copy_src[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    fw_cspan_t src_cspan = FW_CSPAN_FROM_ARRAY(copy_src);
+    fw_size_t copied = fw_span_copy(dst_span, src_cspan);
+    TEST_ASSERT(copied == 8, "fw_span_copy copied 8 bytes");
+    TEST_ASSERT(copy_dst[0] == 1 && copy_dst[7] == 8 && copy_dst[8] == 0xAA, "fw_span_copy bounded destination");
+
     return FW_OK;
 }
 
@@ -76,8 +96,9 @@ static fw_status_t test_memory_pool(void) {
     /* 512 bytes with 32-byte blocks -> sufficient for bitmap + blocks */
     fw_status_t status = fw_pool_init(&pool, raw_memory, sizeof(raw_memory), 32, 8);
     TEST_ASSERT(status == FW_OK, "Pool init must succeed");
+    TEST_ASSERT(pool.block_shift == 5, "Block shift must be 5 for 32-byte blocks");
     fw_size_t cap = fw_pool_capacity(&pool);
-    TEST_ASSERT(cap > 0, "Capacity should be > 0");
+    TEST_ASSERT(cap > 1, "Capacity should be > 1");
     TEST_ASSERT(fw_pool_available(&pool) == cap, "Available should match capacity");
 
     void *blocks[32];
@@ -85,6 +106,9 @@ static fw_status_t test_memory_pool(void) {
         blocks[i] = fw_pool_alloc(&pool);
         TEST_ASSERT(blocks[i] != FW_NULL, "Allocation must succeed");
     }
+
+    /* Verify forward spatial cache locality (block 0 < block 1 < block 2) */
+    TEST_ASSERT((uintptr_t)blocks[1] > (uintptr_t)blocks[0], "Forward sequential allocation order verified");
 
     TEST_ASSERT(fw_pool_is_exhausted(&pool), "Pool should be exhausted");
     TEST_ASSERT(fw_pool_alloc(&pool) == FW_NULL, "Alloc on exhausted pool must return NULL");
@@ -130,10 +154,19 @@ static fw_status_t test_memory_arena(void) {
     /* CRITICAL SAFETY TEST: Integer overflow in allocation size */
     TEST_ASSERT(fw_arena_alloc(&arena, (fw_size_t)-16, 8) == FW_NULL, "Massive overflow size rejected");
 
+    /* CRITICAL SAFETY TEST: Non-power-of-2 alignment rejected */
+    TEST_ASSERT(fw_arena_alloc(&arena, 32, 3) == FW_NULL, "Alignment 3 rejected");
+    TEST_ASSERT(fw_arena_alloc(&arena, 32, 7) == FW_NULL, "Alignment 7 rejected");
+
     /* Allocation 1: 64 bytes */
     void *p1 = fw_arena_alloc(&arena, 64, 8);
     TEST_ASSERT(p1 != FW_NULL, "p1 allocated");
     TEST_ASSERT(fw_arena_used(&arena) == 64, "Used should be 64");
+
+    /* Allocation 1b: Zero-initialized 32 bytes */
+    uint8_t *pz = (uint8_t*)fw_arena_alloc_zeroed(&arena, 32, 8);
+    TEST_ASSERT(pz != FW_NULL, "pz allocated");
+    TEST_ASSERT(pz[0] == 0 && pz[15] == 0 && pz[31] == 0, "fw_arena_alloc_zeroed memory is zeroed");
 
     /* Save mark */
     fw_arena_mark_t mark = fw_arena_mark(&arena);
@@ -141,13 +174,13 @@ static fw_status_t test_memory_arena(void) {
     /* Allocation 2: 128 bytes */
     void *p2 = fw_arena_alloc(&arena, 128, 8);
     TEST_ASSERT(p2 != FW_NULL, "p2 allocated");
-    TEST_ASSERT(fw_arena_used(&arena) == 192, "Used should be 192");
-    TEST_ASSERT(fw_arena_peak(&arena) == 192, "Peak should be 192");
+    TEST_ASSERT(fw_arena_used(&arena) == 224, "Used should be 224");
+    TEST_ASSERT(fw_arena_peak(&arena) == 224, "Peak should be 224");
 
     /* Rewind back to mark */
     fw_arena_rewind(&arena, mark);
-    TEST_ASSERT(fw_arena_used(&arena) == 64, "Used reverted to 64");
-    TEST_ASSERT(fw_arena_peak(&arena) == 192, "Peak watermark preserved");
+    TEST_ASSERT(fw_arena_used(&arena) == 96, "Used reverted to 96");
+    TEST_ASSERT(fw_arena_peak(&arena) == 224, "Peak watermark preserved");
 
     /* Reset completely */
     fw_arena_reset(&arena);
@@ -185,6 +218,23 @@ static fw_status_t test_memory_buffer(void) {
 
     fw_buffer_clear(&buf);
     TEST_ASSERT(fw_buffer_is_empty(&buf), "Buffer cleared");
+
+    /* Test fw_buffer_append_sv */
+    fw_string_view_t sv = FW_SV_LITERAL("ZeroTest");
+    TEST_ASSERT(fw_buffer_append_sv(&buf, sv) == FW_OK, "Append sv ok");
+    TEST_ASSERT(buf.length == 8, "Length is 8 after append_sv");
+
+    /* Test fw_buffer_peek_byte */
+    uint8_t peeked = 0;
+    TEST_ASSERT(fw_buffer_peek_byte(&buf, 0, &peeked) == FW_OK, "Peek byte 0 ok");
+    TEST_ASSERT(peeked == 'Z', "Peeked char is 'Z'");
+    TEST_ASSERT(fw_buffer_peek_byte(&buf, 100, &peeked) == FW_ERR_INVALID_ARG, "Peek out of bounds rejected");
+
+    /* Test fw_buffer_pop_byte */
+    uint8_t popped = 0;
+    TEST_ASSERT(fw_buffer_pop_byte(&buf, &popped) == FW_OK, "Pop byte ok");
+    TEST_ASSERT(popped == 't', "Popped char is 't'");
+    TEST_ASSERT(buf.length == 7, "Length reduced to 7 after pop");
 
     return FW_OK;
 }
@@ -230,6 +280,17 @@ static fw_status_t test_spsc_ringbuffer(void) {
     TEST_ASSERT(out[0] == 5 && out[1] == 6 && out[2] == 7 && out[3] == 8, "First batch correct");
     TEST_ASSERT(out[4] == 9 && out[5] == 10 && out[6] == 11 && out[7] == 12, "Wrapped batch correct");
     TEST_ASSERT(fw_spsc_is_empty(&q), "Queue empty after full read");
+
+    /* Test 2-chunk write wrapping around circular buffer */
+    uint8_t bulk_in[6] = {21, 22, 23, 24, 25, 26};
+    fw_size_t written = fw_spsc_write(&q, bulk_in, sizeof(bulk_in));
+    TEST_ASSERT(written == 6, "Bulk write 6 bytes ok");
+    TEST_ASSERT(fw_spsc_count(&q) == 6, "Count is 6");
+
+    uint8_t bulk_out[6] = {0};
+    fw_size_t read_back = fw_spsc_read(&q, bulk_out, sizeof(bulk_out));
+    TEST_ASSERT(read_back == 6, "Bulk read back 6 bytes ok");
+    TEST_ASSERT(memcmp(bulk_in, bulk_out, 6) == 0, "Bulk 2-chunk content preserved");
 
     return FW_OK;
 }

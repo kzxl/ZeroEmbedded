@@ -17,6 +17,8 @@ out/
 *.bin
 *.hex
 *.map
+*.exe
+*.pdb
 
 # Tooling & IDE
 .vscode/

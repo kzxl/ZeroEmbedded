@@ -57,13 +57,9 @@ impl<T: Copy, const CAPACITY: usize> SpscQueue<T, CAPACITY> {
         #[allow(clippy::let_unit_value)]
         let _ = Self::CAPACITY_CHECK;
 
-        // UnsafeCell array initialization without heap
-        #[allow(clippy::declare_interior_mutable_const)]
-        const UNINIT_CELL: UnsafeCell<MaybeUninit<u8>> = UnsafeCell::new(MaybeUninit::uninit());
-        
-        // Reinterpreting memory safe for const initializer of MaybeUninit
-        let storage = unsafe {
-            core::mem::transmute_copy(&[UNINIT_CELL; CAPACITY])
+        // Safe, zero-copy UnsafeCell array initialization without heap
+        let storage: [UnsafeCell<MaybeUninit<T>>; CAPACITY] = unsafe {
+            MaybeUninit::uninit().assume_init()
         };
 
         Self {
@@ -116,6 +112,72 @@ impl<T: Copy, const CAPACITY: usize> SpscQueue<T, CAPACITY> {
 
         self.tail.store(tail.wrapping_add(1), Ordering::Release);
         Some(item)
+    }
+
+    /// Enqueues a contiguous slice in batches (called from Producer / ISR)
+    pub fn enqueue_slice(&self, slice: &[T]) -> usize {
+        let head = self.head.load(Ordering::Relaxed);
+        let tail = self.tail.load(Ordering::Acquire);
+        let available = CAPACITY - head.wrapping_sub(tail);
+        let to_write = slice.len().min(available);
+        if to_write == 0 {
+            return 0;
+        }
+
+        let idx = head & (CAPACITY - 1);
+        let chunk1 = (CAPACITY - idx).min(to_write);
+        for (i, item) in slice[..chunk1].iter().enumerate() {
+            unsafe {
+                let slot = self.storage[idx + i].get();
+                (*slot).write(*item);
+            }
+        }
+
+        let chunk2 = to_write - chunk1;
+        if chunk2 > 0 {
+            for (i, item) in slice[chunk1..to_write].iter().enumerate() {
+                unsafe {
+                    let slot = self.storage[i].get();
+                    (*slot).write(*item);
+                }
+            }
+        }
+
+        self.head.store(head.wrapping_add(to_write), Ordering::Release);
+        to_write
+    }
+
+    /// Dequeues items into a destination slice in batches (called from Consumer / Thread)
+    pub fn dequeue_slice(&self, dst: &mut [T]) -> usize {
+        let tail = self.tail.load(Ordering::Relaxed);
+        let head = self.head.load(Ordering::Acquire);
+        let count = head.wrapping_sub(tail);
+        let to_read = dst.len().min(count);
+        if to_read == 0 {
+            return 0;
+        }
+
+        let idx = tail & (CAPACITY - 1);
+        let chunk1 = (CAPACITY - idx).min(to_read);
+        for (i, slot_dst) in dst[..chunk1].iter_mut().enumerate() {
+            unsafe {
+                let slot = self.storage[idx + i].get();
+                *slot_dst = (*slot).assume_init();
+            }
+        }
+
+        let chunk2 = to_read - chunk1;
+        if chunk2 > 0 {
+            for (i, slot_dst) in dst[chunk1..to_read].iter_mut().enumerate() {
+                unsafe {
+                    let slot = self.storage[i].get();
+                    *slot_dst = (*slot).assume_init();
+                }
+            }
+        }
+
+        self.tail.store(tail.wrapping_add(to_read), Ordering::Release);
+        to_read
     }
 
     #[inline(always)]

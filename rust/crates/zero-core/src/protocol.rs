@@ -31,18 +31,35 @@ impl RustZerowireFrame {
     }
 }
 
-/// Computes CRC16-CCITT in pure Rust
+const fn generate_crc_table() -> [u16; 256] {
+    let mut table = [0u16; 256];
+    let mut i = 0;
+    while i < 256 {
+        let mut curr = (i as u16) << 8;
+        let mut j = 0;
+        while j < 8 {
+            if (curr & 0x8000) != 0 {
+                curr = (curr << 1) ^ 0x1021;
+            } else {
+                curr <<= 1;
+            }
+            j += 1;
+        }
+        table[i] = curr;
+        i += 1;
+    }
+    table
+}
+
+/// Precomputed CRC16-CCITT lookup table generated at compile-time (Zero Flash overhead)
+pub const CRC16_TABLE: [u16; 256] = generate_crc_table();
+
+/// Computes CRC16-CCITT in pure Rust using compile-time LUT
 pub fn crc16_ccitt(data: &[u8]) -> u16 {
     let mut crc: u16 = 0xFFFF;
     for &byte in data {
-        crc ^= (byte as u16) << 8;
-        for _ in 0..8 {
-            if (crc & 0x8000) != 0 {
-                crc = (crc << 1) ^ 0x1021;
-            } else {
-                crc <<= 1;
-            }
-        }
+        let idx = (((crc >> 8) as u8) ^ byte) as usize;
+        crc = (crc << 8) ^ CRC16_TABLE[idx];
     }
     crc
 }

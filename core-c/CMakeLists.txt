@@ -10,6 +10,7 @@ add_library(zero_core_c STATIC
     src/arena.c
     src/buffer.c
     src/spsc.c
+    src/zerowire.c
 )
 
 target_include_directories(zero_core_c PUBLIC

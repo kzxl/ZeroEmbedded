@@ -12,6 +12,7 @@
 #include "../types.h"
 #include "../result.h"
 #include "../span.h"
+#include "../string_view.h"
 #include "../attributes.h"
 
 #ifdef __cplusplus
@@ -50,6 +51,38 @@ FW_ALWAYS_INLINE fw_status_t fw_buffer_append_byte(fw_buffer_t *buf, uint8_t byt
  */
 FW_ALWAYS_INLINE fw_status_t fw_buffer_append_span(fw_buffer_t *buf, fw_cspan_t span) {
     return fw_buffer_append(buf, span.data, span.length);
+}
+
+/**
+ * @brief Appends a string view to the buffer.
+ */
+FW_ALWAYS_INLINE fw_status_t fw_buffer_append_sv(fw_buffer_t *buf, fw_string_view_t sv) {
+    return fw_buffer_append(buf, sv.data, sv.length);
+}
+
+/**
+ * @brief Safely peeks at a byte at a specific offset without removing it.
+ */
+FW_ALWAYS_INLINE fw_status_t fw_buffer_peek_byte(const fw_buffer_t *buf, fw_size_t index, uint8_t *out_byte) {
+    if (FW_UNLIKELY(buf == FW_NULL || out_byte == FW_NULL || index >= buf->length)) {
+        return FW_ERR_INVALID_ARG;
+    }
+    *out_byte = buf->data[index];
+    return FW_OK;
+}
+
+/**
+ * @brief Pops the last appended byte from the buffer.
+ */
+FW_ALWAYS_INLINE fw_status_t fw_buffer_pop_byte(fw_buffer_t *buf, uint8_t *out_byte) {
+    if (FW_UNLIKELY(buf == FW_NULL || buf->length == 0)) {
+        return FW_ERR_NOT_FOUND;
+    }
+    buf->length--;
+    if (out_byte != FW_NULL) {
+        *out_byte = buf->data[buf->length];
+    }
+    return FW_OK;
 }
 
 /** Returns the active contents as a mutable span */

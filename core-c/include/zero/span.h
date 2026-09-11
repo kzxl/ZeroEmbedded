@@ -9,6 +9,7 @@
 #include "types.h"
 #include "attributes.h"
 #include "assert.h"
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -93,6 +94,21 @@ FW_ALWAYS_INLINE fw_status_t fw_cspan_sub_safe(fw_cspan_t span, fw_size_t offset
     out_sub->data = (const fw_byte_t*)span.data + offset;
     out_sub->length = length;
     return FW_OK;
+}
+
+FW_ALWAYS_INLINE fw_size_t fw_span_copy(fw_span_t dst, fw_cspan_t src) {
+    if (dst.data == FW_NULL || src.data == FW_NULL) return 0;
+    fw_size_t to_copy = dst.length < src.length ? dst.length : src.length;
+    if (to_copy > 0) {
+        memcpy(dst.data, src.data, to_copy);
+    }
+    return to_copy;
+}
+
+FW_ALWAYS_INLINE void fw_span_fill(fw_span_t dst, uint8_t value) {
+    if (dst.data != FW_NULL && dst.length > 0) {
+        memset(dst.data, value, dst.length);
+    }
 }
 
 #define FW_SPAN_FROM_ARRAY(arr) fw_span_make((void*)(arr), sizeof(arr))

@@ -3,8 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Target: Embedded MCU](https://img.shields.io/badge/Target-ARM%20Cortex--M%20%7C%20RISC--V%20%7C%20AVR-orange.svg)]()
 [![Runtime: Zero Overhead](https://img.shields.io/badge/Runtime-0%20Overhead%20(No%20GC%20%7C%20No%20VM)-brightgreen.svg)]()
-[![Tests: 114 Passed](https://img.shields.io/badge/Tests-114%2F114%20Passing%20(100%25)-brightgreen.svg)]()
-[![Performance: Zero-Cost](https://img.shields.io/badge/Overhead-0.946x%20(Zero--Cost%20Verified)-blueviolet.svg)]()
+[![Tests: 138 Passed](https://img.shields.io/badge/Tests-138%2F138%20Passing%20(100%25)-brightgreen.svg)]()
+[![Performance: Zero-Cost](https://img.shields.io/badge/Overhead-0.903x%20(Zero--Cost%20Verified)-blueviolet.svg)]()
 [![Static Analysis: Enforced](https://img.shields.io/badge/Safety-Context%20Analyzer%20(ISR%20%7C%20DMA)-success.svg)]()
 
 **ZeroEmbedded** is an enterprise-grade sovereign embedded framework and toolchain engineered for deterministic real-time microcontrollers. It bridges the gap between **universal C hardware compatibility** and **Rust compile-time memory/concurrency safety** with zero runtime overhead.
@@ -44,7 +44,7 @@ All benchmarks are empirically measured with reproducible hardware counters unde
 | **`fw_pool` vs CRT `malloc/free`** | 2,000,000 | 116.13 ms | **37.88 ms** | **3.1x Faster** *(18.94 ns/alloc-free, O(1) Bitset safe)* |
 | **`fw_buffer_t` vs Pointer-Bump** | 5,000,000 | 4.06 ms | **6.62 ms** | **1.629x** *(Inlined bounds-checked write)* |
 | **SPSC Lockless RingBuffer** | 5,000,000 | N/A | **16.79 ms** | **297.8 Million Ops/sec** *(3.36 ns per push+pop)* |
-| **ZeroWire Packet Full Cycle** | 500,000 | N/A | **226.16 ms** | **50.60 MB/s** *(452 ns/frame with CRC16-CCITT)* |
+| **ZeroWire Packet Full Cycle** | 500,000 | N/A | **64.01 ms** | **178.8 MB/s** *(128 ns/frame with LUT CRC16-CCITT)* |
 
 ### Flash / Binary Footprint Analysis
 ```text
@@ -57,7 +57,7 @@ arena.obj:  2.5 KB  |  spsc.obj:   2.5 KB  |  zerowire.obj: 2.7 KB
 
 ## 🚀 Quick Start
 
-### 1. Build and Run Hardened Test Suite (114 Tests)
+### 1. Build and Run Hardened Test Suite (138 Tests)
 ```bash
 # Using MSVC Developer Command Prompt
 cl /nologo /W4 /WX /O2 /I core-c/include core-c/src/*.c tests/test_core_memory.c /Fe:test_hardened.exe

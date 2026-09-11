@@ -1,4 +1,5 @@
 #include "zero/sync/spsc.h"
+#include <string.h>
 
 fw_status_t fw_spsc_init(fw_spsc_t *spsc, void *buffer, fw_size_t capacity) {
     if (spsc == FW_NULL || buffer == FW_NULL || capacity == 0) {
@@ -68,9 +69,21 @@ fw_size_t fw_spsc_write(fw_spsc_t *spsc, const void *src, fw_size_t count) {
     fw_size_t tail = spsc->tail;
     fw_size_t available = spsc->capacity - (head - tail);
     fw_size_t to_write = count < available ? count : available;
+    if (to_write == 0) {
+        return 0;
+    }
 
-    for (fw_size_t i = 0; i < to_write; ++i) {
-        spsc->buffer[(head + i) & spsc->mask] = in[i];
+    /* 2-chunk contiguous memory copy */
+    fw_size_t idx = head & spsc->mask;
+    fw_size_t chunk1 = spsc->capacity - idx;
+    if (chunk1 > to_write) {
+        chunk1 = to_write;
+    }
+    memcpy(spsc->buffer + idx, in, chunk1);
+
+    fw_size_t chunk2 = to_write - chunk1;
+    if (chunk2 > 0) {
+        memcpy(spsc->buffer, in + chunk1, chunk2);
     }
 
     FW_MEMORY_BARRIER();
@@ -89,9 +102,21 @@ fw_size_t fw_spsc_read(fw_spsc_t *spsc, void *dst, fw_size_t max_count) {
     fw_size_t head = spsc->head;
     fw_size_t count = (head - tail);
     fw_size_t to_read = max_count < count ? max_count : count;
+    if (to_read == 0) {
+        return 0;
+    }
 
-    for (fw_size_t i = 0; i < to_read; ++i) {
-        out[i] = spsc->buffer[(tail + i) & spsc->mask];
+    /* 2-chunk contiguous memory copy */
+    fw_size_t idx = tail & spsc->mask;
+    fw_size_t chunk1 = spsc->capacity - idx;
+    if (chunk1 > to_read) {
+        chunk1 = to_read;
+    }
+    memcpy(out, spsc->buffer + idx, chunk1);
+
+    fw_size_t chunk2 = to_read - chunk1;
+    if (chunk2 > 0) {
+        memcpy(out + chunk1, spsc->buffer, chunk2);
     }
 
     FW_MEMORY_BARRIER();

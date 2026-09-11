@@ -46,6 +46,22 @@ FW_ALWAYS_INLINE fw_bool_t fw_sv_equals(fw_string_view_t a, fw_string_view_t b) 
     return memcmp(a.data, b.data, a.length) == 0 ? FW_TRUE : FW_FALSE;
 }
 
+FW_ALWAYS_INLINE fw_bool_t fw_sv_starts_with(fw_string_view_t sv, fw_string_view_t prefix) {
+    if (prefix.length == 0) return FW_TRUE;
+    if (sv.length < prefix.length) return FW_FALSE;
+    if (sv.data == FW_NULL || prefix.data == FW_NULL) return FW_FALSE;
+    return memcmp(sv.data, prefix.data, prefix.length) == 0 ? FW_TRUE : FW_FALSE;
+}
+
+FW_ALWAYS_INLINE fw_string_view_t fw_sv_sub(fw_string_view_t sv, fw_size_t offset, fw_size_t length) {
+    if (sv.data == FW_NULL || offset >= sv.length) {
+        return fw_sv_make(FW_NULL, 0);
+    }
+    fw_size_t available = sv.length - offset;
+    fw_size_t sub_len = length < available ? length : available;
+    return fw_sv_make(sv.data + offset, sub_len);
+}
+
 #ifdef __cplusplus
 }
 #endif

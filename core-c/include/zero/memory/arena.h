@@ -61,6 +61,15 @@ FW_NODISCARD fw_span_t fw_arena_alloc_span(
 );
 
 /**
+ * @brief Allocates a zero-initialized block of memory from the arena.
+ */
+FW_NODISCARD FW_OWNER void* fw_arena_alloc_zeroed(
+    fw_arena_t *arena,
+    fw_size_t size,
+    fw_size_t alignment
+);
+
+/**
  * @brief Saves current arena allocation mark for scoped rewind.
  */
 FW_INLINE fw_arena_mark_t fw_arena_mark(const fw_arena_t *arena) {

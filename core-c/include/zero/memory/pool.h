@@ -30,6 +30,7 @@ typedef struct {
     fw_size_t        free_count;
     fw_pool_node_t  *free_list;
     uint32_t        *alloc_bitmap;
+    uint8_t          block_shift; /* Log2 of block_size if power of 2, else 0 */
 } fw_pool_t;
 
 /**

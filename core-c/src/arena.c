@@ -25,6 +25,8 @@ void* fw_arena_alloc(fw_arena_t *arena, fw_size_t size, fw_size_t alignment) {
 
     if (alignment == 0) {
         alignment = sizeof(void*);
+    } else if ((alignment & (alignment - 1)) != 0) {
+        return FW_NULL; /* Alignment must be power of 2 */
     }
 
     uintptr_t curr_ptr = (uintptr_t)(arena->buffer + arena->offset);
@@ -43,6 +45,14 @@ void* fw_arena_alloc(fw_arena_t *arena, fw_size_t size, fw_size_t alignment) {
     }
 
     return (void*)aligned_ptr;
+}
+
+void* fw_arena_alloc_zeroed(fw_arena_t *arena, fw_size_t size, fw_size_t alignment) {
+    void *ptr = fw_arena_alloc(arena, size, alignment);
+    if (ptr != FW_NULL) {
+        memset(ptr, 0, size);
+    }
+    return ptr;
 }
 
 fw_span_t fw_arena_alloc_span(fw_arena_t *arena, fw_size_t size, fw_size_t alignment) {
