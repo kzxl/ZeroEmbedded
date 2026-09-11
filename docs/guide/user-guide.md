@@ -27,7 +27,7 @@ platform = ststm32
 board = blackpill_f401cc
 framework = stm32cube
 lib_deps =
-    https://github.com/ZeroUniverse/ZeroEmbedded.git#v0.7.0
+    https://github.com/kzxl/ZeroEmbedded.git#v0.7.0
 ```
 
 PlatformIO will automatically resolve `core-c/include` and `core-c/src`, compile static objects, and make `#include "zero/zero.h"` available across your firmware.
@@ -45,7 +45,7 @@ project(my_firmware LANGUAGES C)
 include(FetchContent)
 FetchContent_Declare(
     ZeroEmbedded
-    GIT_REPOSITORY https://github.com/ZeroUniverse/ZeroEmbedded.git
+    GIT_REPOSITORY https://github.com/kzxl/ZeroEmbedded.git
     GIT_TAG        v0.7.0
     SOURCE_SUBDIR  core-c
 )

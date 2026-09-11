@@ -3,8 +3,8 @@
   <vendor>ZeroUniverse</vendor>
   <name>ZeroEmbedded</name>
   <description>Zero-allocation, deterministic embedded C framework for safety-critical MCUs</description>
-  <url>https://github.com/ZeroUniverse/ZeroEmbedded</url>
-  <supportContact>https://github.com/ZeroUniverse/ZeroEmbedded/issues</supportContact>
+  <url>https://github.com/kzxl/ZeroEmbedded</url>
+  <supportContact>https://github.com/kzxl/ZeroEmbedded/issues</supportContact>
   <license>LICENSE</license>
 
   <releases>

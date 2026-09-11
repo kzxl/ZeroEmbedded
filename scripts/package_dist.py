@@ -75,10 +75,10 @@ def create_dist_library_json(dest_dir):
             }
         ],
         "license": "MIT",
-        "homepage": "https://github.com/ZeroUniverse/ZeroEmbedded",
+        "homepage": "https://github.com/kzxl/ZeroEmbedded",
         "repository": {
             "type": "git",
-            "url": "https://github.com/ZeroUniverse/ZeroEmbedded.git"
+            "url": "https://github.com/kzxl/ZeroEmbedded.git"
         },
         "frameworks": ["*"],
         "platforms": ["*"],
