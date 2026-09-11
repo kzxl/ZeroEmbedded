@@ -17,8 +17,9 @@
 
 ```text
 ZeroEmbedded/
+├── CMakeLists.txt           # Master root CMake build script with CTest
 ├── core-c/                  # C Foundation Tier (Zero-cost primitives & memory engines)
-│   ├── CMakeLists.txt       # Unified CMake build script
+│   ├── CMakeLists.txt       # Core C library CMake build script
 │   ├── include/zero/
 │   │   ├── zero.h           # Master umbrella header
 │   │   ├── types.h          # Fixed-width types, fw_size_t, fw_bool_t
@@ -27,12 +28,14 @@ ZeroEmbedded/
 │   │   ├── string_view.h    # fw_string_view_t (Zero-allocation string slice)
 │   │   ├── assert.h         # FW_STATIC_ASSERT, FW_ASSERT, panic hooks
 │   │   ├── attributes.h     # FW_INLINE, FW_MEMORY_BARRIER, FW_ISR, FW_DMA, FW_OWNER
+│   │   ├── tasklet.h        # fw_tasklet_queue_t (Cooperative event dispatcher)
 │   │   ├── memory/          # pool.h, arena.h, buffer.h
 │   │   ├── sync/            # spsc.h (Lock-free single-producer single-consumer)
-│   │   ├── hal/             # gpio.h, uart.h, timer.h
+│   │   ├── hal/             # gpio.h, uart.h, timer.h (with fw_timeout_t)
 │   │   ├── protocol/        # zerowire.h (Binary framing & stream resynchronization)
 │   │   └── rtos/            # rtos.h (Unified RTOS abstraction)
-│   └── src/                 # pool.c, arena.c, buffer.c, spsc.c, zerowire.c, assert.c
+│   └── src/                 # pool.c, arena.c, buffer.c, spsc.c, zerowire.c, assert.c,
+│                            # gpio.c, timer.c, uart.c, tasklet.c, rtos_baremetal.c
 │
 ├── rust/                    # Rust Safety Tier (Cargo Workspace, strictly #![no_std])
 │   ├── Cargo.toml           # Release profile: opt-level = "s", lto = true
@@ -46,11 +49,19 @@ ZeroEmbedded/
 │   ├── analyzer/            # zero_analyzer.py (Context & ISR safety analysis)
 │   └── codegen/             # svd_codegen.py (CMSIS-SVD peripheral register generator)
 │
+├── docs/                    # Technical & Architectural Documentation
+│   ├── architect/           # Architecture specs & modernization roadmap
+│   └── guide/               # user-guide.md (Developer manual & code recipes)
+│
 ├── hal/                     # Auto-generated hardware register maps (hw_gpioa.h)
-├── rtos/                    # Bare-metal, FreeRTOS, and Zephyr adapters
-├── benchmarks/              # Comprehensive performance benchmark suite (with HEPM logging)
-├── tests/                   # 138 Unit, Concurrency, and Safety Tests (100% Pass)
-└── examples/stm32_poc/      # End-to-end verified firmware PoC
+├── rtos/                    # Bare-metal adapter reference
+├── benchmarks/              # Performance benchmark suite (HEPM provenance)
+├── tests/                   # Hardened unit tests (Core Memory + HAL & Tasklets)
+├── scripts/                 # build_and_test.ps1, run_demo.ps1
+└── examples/
+    ├── interactive_demo/    # Live interactive real-time Edge Node console
+    ├── host_sim/            # Virtual host simulation demonstration
+    └── stm32_poc/           # Verified ARM Cortex-M firmware PoC
 ```
 
 ---
