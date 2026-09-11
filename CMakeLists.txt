@@ -30,6 +30,10 @@ if(ZERO_BUILD_TESTS)
     add_executable(test_primitives tests/test_primitives.c)
     target_link_libraries(test_primitives PRIVATE Zero::core_c)
     add_test(NAME ModernPrimitivesTests COMMAND test_primitives)
+
+    add_executable(test_storage tests/test_storage.c)
+    target_link_libraries(test_storage PRIVATE Zero::core_c)
+    add_test(NAME StorageTests COMMAND test_storage)
 endif()
 
 # 3. Comprehensive Performance Benchmark Suite

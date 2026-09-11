@@ -21,6 +21,7 @@ add_library(zero_core_c STATIC
     src/watchdog.c
     src/fsm.c
     src/filter.c
+    src/nvs.c
 )
 
 add_library(Zero::core_c ALIAS zero_core_c)

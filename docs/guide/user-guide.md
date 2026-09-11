@@ -413,6 +413,34 @@ if (fw_debounce_update(&s_button_db, fw_gpio_read(BTN_PIN))) {
 
 ---
 
+### 3.14 Dual-Bank Ping-Pong Flash Storage (`fw_nvs_t`)
+Wear-leveling, power-fail safe key-value parameter storage on Flash (internal MCU or external SPI NOR) with zero dynamic heap and CRC16-CCITT integrity:
+
+```c
+#include "zero/zero.h"
+
+static fw_nvs_t s_nvs;
+
+void storage_init(const fw_flash_driver_t *flash_bsp) {
+    // Mounts Dual-Bank NVS across Bank 0 (0x08010000) and Bank 1 (0x08010800)
+    fw_nvs_init(&s_nvs, flash_bsp, 0x08010000, 0x08010800);
+}
+
+void save_device_serial(const char *serial) {
+    // Appends new record; triggers zero-heap compaction automatically when full
+    fw_nvs_write(&s_nvs, 0x1001, fw_cspan_make(serial, strlen(serial)));
+}
+
+void load_device_serial(char *out_buf, fw_size_t buf_size) {
+    fw_size_t len = 0;
+    if (fw_nvs_read(&s_nvs, 0x1001, fw_span_make(out_buf, buf_size - 1), &len) == FW_OK) {
+        out_buf[len] = '\0';
+    }
+}
+```
+
+---
+
 ## 4. Complete Firmware Application Template
 
 The following template represents a production-ready bare-metal firmware archetype incorporating all subsystems:
