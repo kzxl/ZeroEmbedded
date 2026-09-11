@@ -18,6 +18,9 @@ add_library(zero_core_c STATIC
     src/rtos_baremetal.c
     src/power.c
     src/dispatcher.c
+    src/watchdog.c
+    src/fsm.c
+    src/filter.c
 )
 
 add_library(Zero::core_c ALIAS zero_core_c)

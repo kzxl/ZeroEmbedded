@@ -329,6 +329,90 @@ python tooling/codegen/svd_codegen.py --svd tooling/codegen/stm32_sample.svd --o
 
 ---
 
+### 3.11 Multi-Task Watchdog Supervisor (`fw_wdt_t`)
+Guarantees multi-task liveness before kicking hardware watchdogs (IWDG/WWDG), eliminating the risk of locked superloops being masked by timer interrupts:
+
+```c
+#include "zero/zero.h"
+
+static fw_wdt_supervisor_t s_wdt;
+
+void app_init(void) {
+    // 500ms supervision window; kicks hardware IWDG only when all tasks report
+    fw_wdt_init(&s_wdt, 500, bsp_kick_hardware_iwdg, bsp_on_wdt_starvation_fault);
+    fw_wdt_register_task(&s_wdt, 0); // Task 0: Sensor acquisition
+    fw_wdt_register_task(&s_wdt, 1); // Task 1: Protocol comms
+}
+
+void sensor_task(void) {
+    // Do sensor work...
+    fw_wdt_heartbeat(&s_wdt, 0);
+}
+
+void comms_task(void) {
+    // Do comms work...
+    fw_wdt_heartbeat(&s_wdt, 1);
+}
+
+void superloop(void) {
+    // Evaluates liveness of all registered tasks
+    fw_wdt_service(&s_wdt);
+}
+```
+
+---
+
+### 3.12 Table-Driven Finite State Machine (`fw_fsm_t`)
+Clean, deterministic state machine with `const` transition tables stored in Flash/ROM, zero dynamic heap, and enter/exit hooks:
+
+```c
+#include "zero/zero.h"
+
+enum { STATE_STANDBY = 0, STATE_ACTIVE, STATE_ERROR };
+enum { EVT_START = 1, EVT_FAULT, EVT_RESET };
+
+static const fw_fsm_transition_t s_transitions[] = {
+    { STATE_STANDBY, EVT_START, check_battery_ok_guard, on_start_motor_action, STATE_ACTIVE },
+    { STATE_ACTIVE,  EVT_FAULT, FW_NULL,                on_safe_shutdown_action, STATE_ERROR  },
+    { FW_FSM_STATE_ANY, EVT_RESET, FW_NULL,             FW_NULL,               STATE_STANDBY }
+};
+
+static fw_fsm_t s_fsm;
+
+void fsm_setup(void) {
+    fw_fsm_init(&s_fsm, STATE_STANDBY, s_transitions, 3, FW_NULL, 0, FW_NULL);
+}
+
+void handle_event(fw_fsm_event_t evt) {
+    fw_fsm_dispatch(&s_fsm, evt);
+}
+```
+
+---
+
+### 3.13 DSP Sensor Signal Processing & Debounce (`zero/dsp/filter.h`)
+Fixed-point integer filters and mechanical switch debouncers running in ~3 CPU cycles with 0% software float overhead:
+
+```c
+#include "zero/zero.h"
+
+// 1. Exponential Moving Average (EMA) - 12.5% smoothing (alpha_shift = 3)
+uint16_t filtered_adc = fw_filter_ema_u16(prev_adc, raw_adc, 3);
+
+// 2. Median-3 Filter: Instantly removes isolated ADC spike glitches
+uint16_t clean_sample = fw_filter_median3_u16(s0, s1, s2);
+
+// 3. Switch Debouncing: Filters push button contacts
+static fw_debounce_t s_button_db;
+fw_debounce_init(&s_button_db, 5, FW_FALSE); // Requires 5 stable samples
+
+if (fw_debounce_update(&s_button_db, fw_gpio_read(BTN_PIN))) {
+    // State transitioned! Execute button press action.
+}
+```
+
+---
+
 ## 4. Complete Firmware Application Template
 
 The following template represents a production-ready bare-metal firmware archetype incorporating all subsystems:

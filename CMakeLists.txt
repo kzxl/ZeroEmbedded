@@ -26,6 +26,10 @@ if(ZERO_BUILD_TESTS)
     add_executable(test_advanced tests/test_advanced.c)
     target_link_libraries(test_advanced PRIVATE Zero::core_c)
     add_test(NAME AdvancedFeatureTests COMMAND test_advanced)
+
+    add_executable(test_primitives tests/test_primitives.c)
+    target_link_libraries(test_primitives PRIVATE Zero::core_c)
+    add_test(NAME ModernPrimitivesTests COMMAND test_primitives)
 endif()
 
 # 3. Comprehensive Performance Benchmark Suite
