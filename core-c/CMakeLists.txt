@@ -6,6 +6,9 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_library(zero_core_c STATIC
     src/assert.c
+    src/pool.c
+    src/arena.c
+    src/buffer.c
 )
 
 target_include_directories(zero_core_c PUBLIC

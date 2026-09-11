@@ -13,6 +13,9 @@
 #include "result.h"
 #include "span.h"
 #include "string_view.h"
+#include "memory/pool.h"
+#include "memory/arena.h"
+#include "memory/buffer.h"
 
 #define ZERO_EMBEDDED_VERSION_MAJOR 0
 #define ZERO_EMBEDDED_VERSION_MINOR 1
