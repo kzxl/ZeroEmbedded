@@ -50,6 +50,19 @@ fw_size_t fw_zerowire_encode(const fw_zerowire_frame_t *frame, fw_span_t out_buf
  */
 fw_status_t fw_zerowire_decode(fw_cspan_t raw_data, fw_zerowire_frame_t *out_frame);
 
+/**
+ * @brief Scans a stream buffer for the next valid ZeroWire frame, skipping noise bytes.
+ * @param stream_data Contiguous stream slice.
+ * @param out_frame Decoded frame destination.
+ * @param out_consumed Number of bytes consumed from stream_data.
+ * @return FW_OK on success, FW_ERR_NOT_FOUND if incomplete, FW_ERR_CORRUPTED if invalid.
+ */
+fw_status_t fw_zerowire_stream_sync(
+    fw_cspan_t stream_data,
+    fw_zerowire_frame_t *out_frame,
+    fw_size_t *out_consumed
+);
+
 #ifdef __cplusplus
 }
 #endif

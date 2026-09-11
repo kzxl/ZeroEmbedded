@@ -32,6 +32,7 @@ fw_status_t fw_spsc_push(fw_spsc_t *spsc, uint8_t byte) {
     }
 
     spsc->buffer[head & spsc->mask] = byte;
+    FW_MEMORY_BARRIER();
     spsc->head = head + 1;
 
     return FW_OK;
@@ -43,6 +44,7 @@ fw_status_t fw_spsc_pop(fw_spsc_t *spsc, uint8_t *out_byte) {
     }
 
     fw_size_t tail = spsc->tail;
+    FW_MEMORY_BARRIER();
     fw_size_t head = spsc->head;
 
     if (tail == head) {
@@ -50,6 +52,7 @@ fw_status_t fw_spsc_pop(fw_spsc_t *spsc, uint8_t *out_byte) {
     }
 
     *out_byte = spsc->buffer[tail & spsc->mask];
+    FW_MEMORY_BARRIER();
     spsc->tail = tail + 1;
 
     return FW_OK;
@@ -70,6 +73,7 @@ fw_size_t fw_spsc_write(fw_spsc_t *spsc, const void *src, fw_size_t count) {
         spsc->buffer[(head + i) & spsc->mask] = in[i];
     }
 
+    FW_MEMORY_BARRIER();
     spsc->head = head + to_write;
     return to_write;
 }
@@ -81,6 +85,7 @@ fw_size_t fw_spsc_read(fw_spsc_t *spsc, void *dst, fw_size_t max_count) {
 
     uint8_t *out = (uint8_t*)dst;
     fw_size_t tail = spsc->tail;
+    FW_MEMORY_BARRIER();
     fw_size_t head = spsc->head;
     fw_size_t count = (head - tail);
     fw_size_t to_read = max_count < count ? max_count : count;
@@ -89,6 +94,7 @@ fw_size_t fw_spsc_read(fw_spsc_t *spsc, void *dst, fw_size_t max_count) {
         out[i] = spsc->buffer[(tail + i) & spsc->mask];
     }
 
+    FW_MEMORY_BARRIER();
     spsc->tail = tail + to_read;
     return to_read;
 }

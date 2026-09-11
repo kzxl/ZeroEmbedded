@@ -1,5 +1,6 @@
 #include "zero/memory/pool.h"
 #include "zero/assert.h"
+#include <string.h>
 
 FW_INLINE uintptr_t align_up(uintptr_t ptr, fw_size_t align) {
     return (ptr + (align - 1)) & ~(uintptr_t)(align - 1);
@@ -42,13 +43,28 @@ fw_status_t fw_pool_init(
     }
 
     fw_size_t usable_size = buffer_size - overhead;
-    fw_size_t capacity = usable_size / aligned_block_size;
+
+    /* Reserve space for allocation bitmap at the beginning of aligned storage */
+    fw_size_t estimated_cap = usable_size / aligned_block_size;
+    fw_size_t bitmap_words = (estimated_cap + 31) / 32;
+    fw_size_t bitmap_bytes = (fw_size_t)align_up(bitmap_words * sizeof(uint32_t), alignment);
+
+    if (usable_size <= bitmap_bytes) {
+        return FW_ERR_INVALID_ARG;
+    }
+
+    fw_size_t block_space = usable_size - bitmap_bytes;
+    fw_size_t capacity = block_space / aligned_block_size;
 
     if (capacity == 0) {
         return FW_ERR_INVALID_ARG;
     }
 
-    pool->storage = (void*)aligned_start;
+    pool->alloc_bitmap = (uint32_t*)aligned_start;
+    memset(pool->alloc_bitmap, 0, bitmap_bytes);
+
+    uintptr_t block_start = align_up(aligned_start + bitmap_bytes, alignment);
+    pool->storage = (void*)block_start;
     pool->storage_size = capacity * aligned_block_size;
     pool->block_size = aligned_block_size;
     pool->alignment = alignment;
@@ -77,6 +93,9 @@ void* fw_pool_alloc(fw_pool_t *pool) {
     pool->free_list = node->next;
     pool->free_count--;
 
+    fw_size_t idx = (fw_size_t)(((uintptr_t)node - (uintptr_t)pool->storage) / pool->block_size);
+    pool->alloc_bitmap[idx / 32] |= (1U << (idx % 32));
+
     return (void*)node;
 }
 
@@ -98,6 +117,22 @@ fw_status_t fw_pool_free(fw_pool_t *pool, void *block) {
     if ((offset % pool->block_size) != 0) {
         return FW_ERR_INVALID_ARG;
     }
+
+    fw_size_t idx = offset / pool->block_size;
+    uint32_t mask = 1U << (idx % 32);
+
+    /* Double-Free Check: block must be currently marked as allocated */
+    if ((pool->alloc_bitmap[idx / 32] & mask) == 0) {
+        return FW_ERR_INVALID_ARG; /* REJECT DOUBLE FREE */
+    }
+
+    /* Mark block as free in bitmap */
+    pool->alloc_bitmap[idx / 32] &= ~mask;
+
+#if ZERO_ENABLE_ASSERT
+    /* Poison memory in debug builds to immediately catch Use-After-Free */
+    memset(block, 0xDF, pool->block_size);
+#endif
 
     /* Push back onto intrusive free list */
     fw_pool_node_t *node = (fw_pool_node_t*)block;

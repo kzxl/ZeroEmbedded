@@ -80,3 +80,39 @@ fw_status_t fw_zerowire_decode(fw_cspan_t raw_data, fw_zerowire_frame_t *out_fra
 
     return FW_OK;
 }
+
+fw_status_t fw_zerowire_stream_sync(
+    fw_cspan_t stream_data,
+    fw_zerowire_frame_t *out_frame,
+    fw_size_t *out_consumed
+) {
+    if (stream_data.data == FW_NULL || out_frame == FW_NULL || out_consumed == FW_NULL) {
+        return FW_ERR_INVALID_ARG;
+    }
+
+    *out_consumed = 0;
+    const uint8_t *bytes = (const uint8_t*)stream_data.data;
+    fw_size_t len = stream_data.length;
+
+    /* Scan forward for SOF pattern: 0xAA, 0x55 */
+    for (fw_size_t i = 0; i + 1 < len; ++i) {
+        if (bytes[i] == ZEROWIRE_SOF0 && bytes[i + 1] == ZEROWIRE_SOF1) {
+            /* Attempt decode from this offset */
+            fw_cspan_t candidate = fw_cspan_make((const void*)(bytes + i), len - i);
+            fw_status_t st = fw_zerowire_decode(candidate, out_frame);
+            if (st == FW_OK) {
+                *out_consumed = i + ZEROWIRE_HEADER_SIZE + out_frame->length + ZEROWIRE_CRC_SIZE;
+                return FW_OK;
+            } else if (st == FW_ERR_NOT_FOUND) {
+                /* Incomplete frame detected, skip noise up to SOF */
+                *out_consumed = i;
+                return FW_ERR_NOT_FOUND;
+            }
+            /* If corrupted, continue scanning for next SOF */
+        }
+    }
+
+    /* No SOF found in stream buffer; consume all except last byte (which might be 0xAA) */
+    *out_consumed = len > 0 ? (len - 1) : 0;
+    return FW_ERR_NOT_FOUND;
+}

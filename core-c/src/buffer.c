@@ -21,7 +21,7 @@ fw_status_t fw_buffer_append(fw_buffer_t *buf, const void *src, fw_size_t count)
         return FW_OK;
     }
 
-    if (buf->length + count > buf->capacity) {
+    if (count > buf->capacity - buf->length) {
         return FW_ERR_BUFFER_OVERFLOW;
     }
 

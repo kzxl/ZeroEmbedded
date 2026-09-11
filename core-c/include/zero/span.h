@@ -57,7 +57,7 @@ FW_ALWAYS_INLINE fw_bool_t fw_cspan_is_empty(fw_cspan_t span) {
 
 FW_ALWAYS_INLINE fw_span_t fw_span_sub(fw_span_t span, fw_size_t offset, fw_size_t length) {
     FW_ASSERT(offset <= span.length);
-    FW_ASSERT(offset + length <= span.length);
+    FW_ASSERT(length <= span.length - offset);
     fw_span_t sub;
     sub.data = (fw_byte_t*)span.data + offset;
     sub.length = length;
@@ -66,11 +66,33 @@ FW_ALWAYS_INLINE fw_span_t fw_span_sub(fw_span_t span, fw_size_t offset, fw_size
 
 FW_ALWAYS_INLINE fw_cspan_t fw_cspan_sub(fw_cspan_t span, fw_size_t offset, fw_size_t length) {
     FW_ASSERT(offset <= span.length);
-    FW_ASSERT(offset + length <= span.length);
+    FW_ASSERT(length <= span.length - offset);
     fw_cspan_t sub;
     sub.data = (const fw_byte_t*)span.data + offset;
     sub.length = length;
     return sub;
+}
+
+FW_ALWAYS_INLINE fw_status_t fw_span_sub_safe(fw_span_t span, fw_size_t offset, fw_size_t length, fw_span_t *out_sub) {
+    if (out_sub == FW_NULL) return FW_ERR_INVALID_ARG;
+    if (offset > span.length || length > span.length - offset) {
+        *out_sub = fw_span_make(FW_NULL, 0);
+        return FW_ERR_BUFFER_OVERFLOW;
+    }
+    out_sub->data = (fw_byte_t*)span.data + offset;
+    out_sub->length = length;
+    return FW_OK;
+}
+
+FW_ALWAYS_INLINE fw_status_t fw_cspan_sub_safe(fw_cspan_t span, fw_size_t offset, fw_size_t length, fw_cspan_t *out_sub) {
+    if (out_sub == FW_NULL) return FW_ERR_INVALID_ARG;
+    if (offset > span.length || length > span.length - offset) {
+        *out_sub = fw_cspan_make(FW_NULL, 0);
+        return FW_ERR_BUFFER_OVERFLOW;
+    }
+    out_sub->data = (const fw_byte_t*)span.data + offset;
+    out_sub->length = length;
+    return FW_OK;
 }
 
 #define FW_SPAN_FROM_ARRAY(arr) fw_span_make((void*)(arr), sizeof(arr))

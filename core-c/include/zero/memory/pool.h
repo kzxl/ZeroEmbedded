@@ -29,6 +29,7 @@ typedef struct {
     fw_size_t        capacity;
     fw_size_t        free_count;
     fw_pool_node_t  *free_list;
+    uint32_t        *alloc_bitmap;
 } fw_pool_t;
 
 /**

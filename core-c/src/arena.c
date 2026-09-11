@@ -1,4 +1,5 @@
 #include "zero/memory/arena.h"
+#include <string.h>
 
 FW_INLINE uintptr_t align_up(uintptr_t ptr, fw_size_t align) {
     return (ptr + (align - 1)) & ~(uintptr_t)(align - 1);
@@ -30,8 +31,10 @@ void* fw_arena_alloc(fw_arena_t *arena, fw_size_t size, fw_size_t alignment) {
     uintptr_t aligned_ptr = align_up(curr_ptr, alignment);
     fw_size_t padding = (fw_size_t)(aligned_ptr - curr_ptr);
 
-    if (arena->offset + padding + size > arena->capacity) {
-        return FW_NULL; /* Out of memory */
+    /* Overflow-safe capacity check */
+    if (padding > arena->capacity - arena->offset ||
+        size > arena->capacity - arena->offset - padding) {
+        return FW_NULL; /* Out of memory / integer overflow prevented */
     }
 
     arena->offset += (padding + size);
@@ -52,12 +55,19 @@ fw_span_t fw_arena_alloc_span(fw_arena_t *arena, fw_size_t size, fw_size_t align
 
 void fw_arena_rewind(fw_arena_t *arena, fw_arena_mark_t mark) {
     if (arena != FW_NULL && mark <= arena->offset) {
+#if ZERO_ENABLE_ASSERT
+        /* Poison freed region to catch dangling pointer dereferences */
+        memset(arena->buffer + mark, 0xDD, arena->offset - mark);
+#endif
         arena->offset = mark;
     }
 }
 
 void fw_arena_reset(fw_arena_t *arena) {
     if (arena != FW_NULL) {
+#if ZERO_ENABLE_ASSERT
+        memset(arena->buffer, 0xDD, arena->offset);
+#endif
         arena->offset = 0;
     }
 }

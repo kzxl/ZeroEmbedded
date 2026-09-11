@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "zero/zero.h"
+#include "zero/protocol/zerowire.h"
 
 static int g_tests_run = 0;
 static int g_tests_passed = 0;
@@ -49,6 +50,11 @@ static fw_status_t test_span_and_string_view(void) {
     TEST_ASSERT(sub.length == 20, "Subspan length must be 20");
     TEST_ASSERT(*((uint8_t*)sub.data) == 11, "Subspan offset 0 should match buffer[10]");
 
+    /* Test fw_span_sub_safe bounds check */
+    fw_span_t safe_sub;
+    TEST_ASSERT(fw_span_sub_safe(span, 10, 1000, &safe_sub) == FW_ERR_BUFFER_OVERFLOW, "Subspan overflow caught");
+    TEST_ASSERT(safe_sub.data == FW_NULL, "Safe subspan set to null on overflow");
+
     fw_string_view_t sv1 = FW_SV_LITERAL("ZeroEmbedded");
     fw_string_view_t sv2 = fw_sv_from_cstr("ZeroEmbedded");
     fw_string_view_t sv3 = FW_SV_LITERAL("ZeroPlatform");
@@ -64,17 +70,18 @@ static fw_status_t test_span_and_string_view(void) {
 /* Test 3: Fixed-Size Block Memory Pool                                       */
 /* ========================================================================== */
 static fw_status_t test_memory_pool(void) {
-    FW_ALIGNED(16) static uint8_t raw_memory[256];
+    FW_ALIGNED(16) static uint8_t raw_memory[512];
     fw_pool_t pool;
 
-    /* 256 bytes with 32-byte blocks -> 8 blocks */
+    /* 512 bytes with 32-byte blocks -> sufficient for bitmap + blocks */
     fw_status_t status = fw_pool_init(&pool, raw_memory, sizeof(raw_memory), 32, 8);
     TEST_ASSERT(status == FW_OK, "Pool init must succeed");
-    TEST_ASSERT(fw_pool_capacity(&pool) == 8, "Capacity should be 8");
-    TEST_ASSERT(fw_pool_available(&pool) == 8, "Available should be 8");
+    fw_size_t cap = fw_pool_capacity(&pool);
+    TEST_ASSERT(cap > 0, "Capacity should be > 0");
+    TEST_ASSERT(fw_pool_available(&pool) == cap, "Available should match capacity");
 
-    void *blocks[8];
-    for (int i = 0; i < 8; ++i) {
+    void *blocks[32];
+    for (fw_size_t i = 0; i < cap; ++i) {
         blocks[i] = fw_pool_alloc(&pool);
         TEST_ASSERT(blocks[i] != FW_NULL, "Allocation must succeed");
     }
@@ -83,22 +90,25 @@ static fw_status_t test_memory_pool(void) {
     TEST_ASSERT(fw_pool_alloc(&pool) == FW_NULL, "Alloc on exhausted pool must return NULL");
 
     /* Free one block and re-allocate */
-    TEST_ASSERT(fw_pool_free(&pool, blocks[3]) == FW_OK, "Free must succeed");
+    TEST_ASSERT(fw_pool_free(&pool, blocks[0]) == FW_OK, "Free must succeed");
     TEST_ASSERT(fw_pool_available(&pool) == 1, "Available count must be 1");
 
+    /* CRITICAL SAFETY TEST: DOUBLE-FREE REJECTION */
+    TEST_ASSERT(fw_pool_free(&pool, blocks[0]) == FW_ERR_INVALID_ARG, "DOUBLE-FREE MUST BE REJECTED");
+
     void *reallocated = fw_pool_alloc(&pool);
-    TEST_ASSERT(reallocated == blocks[3], "Should recycle recently freed block");
+    TEST_ASSERT(reallocated == blocks[0], "Should recycle recently freed block");
     TEST_ASSERT(fw_pool_is_exhausted(&pool), "Pool should be exhausted again");
 
     /* Free all */
-    for (int i = 0; i < 8; ++i) {
-        if (i == 3) {
+    for (fw_size_t i = 0; i < cap; ++i) {
+        if (i == 0) {
             TEST_ASSERT(fw_pool_free(&pool, reallocated) == FW_OK, "Free must succeed");
         } else {
             TEST_ASSERT(fw_pool_free(&pool, blocks[i]) == FW_OK, "Free must succeed");
         }
     }
-    TEST_ASSERT(fw_pool_available(&pool) == 8, "All blocks returned");
+    TEST_ASSERT(fw_pool_available(&pool) == cap, "All blocks returned");
 
     /* Out of bounds pointer rejection */
     uint8_t external_var = 42;
@@ -116,6 +126,9 @@ static fw_status_t test_memory_arena(void) {
 
     TEST_ASSERT(fw_arena_init(&arena, arena_mem, sizeof(arena_mem)) == FW_OK, "Arena init ok");
     TEST_ASSERT(fw_arena_available(&arena) == 512, "Full capacity available");
+
+    /* CRITICAL SAFETY TEST: Integer overflow in allocation size */
+    TEST_ASSERT(fw_arena_alloc(&arena, (fw_size_t)-16, 8) == FW_NULL, "Massive overflow size rejected");
 
     /* Allocation 1: 64 bytes */
     void *p1 = fw_arena_alloc(&arena, 64, 8);
@@ -153,6 +166,9 @@ static fw_status_t test_memory_buffer(void) {
     TEST_ASSERT(fw_buffer_init(&buf, raw, sizeof(raw)) == FW_OK, "Buffer init ok");
     TEST_ASSERT(fw_buffer_is_empty(&buf), "Buffer initially empty");
     TEST_ASSERT(fw_buffer_remaining(&buf) == 16, "Remaining is 16");
+
+    /* CRITICAL SAFETY TEST: Integer overflow on count */
+    TEST_ASSERT(fw_buffer_append(&buf, "X", (fw_size_t)-1) == FW_ERR_BUFFER_OVERFLOW, "Massive overflow count rejected");
 
     const char *msg = "ZeroEmb";
     TEST_ASSERT(fw_buffer_append(&buf, msg, 7) == FW_OK, "Append 7 bytes ok");
@@ -218,8 +234,43 @@ static fw_status_t test_spsc_ringbuffer(void) {
     return FW_OK;
 }
 
+/* ========================================================================== */
+/* Test 7: ZeroWire Stream Resynchronization across Noise                     */
+/* ========================================================================== */
+static fw_status_t test_zerowire_stream_resync(void) {
+    /* Create frame */
+    fw_zerowire_frame_t tx_frame;
+    tx_frame.seq = 42;
+    tx_frame.msg_id = 0x5A;
+    tx_frame.length = 5;
+    memcpy(tx_frame.payload, "HELLO", 5);
+
+    uint8_t frame_buf[32];
+    fw_span_t frame_span = FW_SPAN_FROM_ARRAY(frame_buf);
+    fw_size_t frame_len = fw_zerowire_encode(&tx_frame, frame_span);
+    TEST_ASSERT(frame_len > 0, "Encode ok");
+
+    /* Create stream with 7 noise bytes prepended */
+    uint8_t stream_buf[64];
+    memset(stream_buf, 0xFF, 7); /* Line noise / garbage */
+    memcpy(stream_buf + 7, frame_buf, frame_len);
+
+    fw_cspan_t stream_cspan = fw_cspan_make(stream_buf, 7 + frame_len);
+    fw_zerowire_frame_t rx_frame;
+    fw_size_t consumed = 0;
+
+    fw_status_t status = fw_zerowire_stream_sync(stream_cspan, &rx_frame, &consumed);
+    TEST_ASSERT(status == FW_OK, "Stream resync found valid frame");
+    TEST_ASSERT(consumed == 7 + frame_len, "Consumed exactly noise + frame size");
+    TEST_ASSERT(rx_frame.seq == 42, "Seq matches");
+    TEST_ASSERT(rx_frame.msg_id == 0x5A, "MsgID matches");
+    TEST_ASSERT(memcmp(rx_frame.payload, "HELLO", 5) == 0, "Payload matches");
+
+    return FW_OK;
+}
+
 int main(void) {
-    printf("\n--- Running ZeroEmbedded Phase 1 & 2 Test Suite ---\n");
+    printf("\n--- Running ZeroEmbedded Hardened Test Suite ---\n");
 
     if (test_primitives() != FW_OK) return 1;
     if (test_span_and_string_view() != FW_OK) return 1;
@@ -227,6 +278,7 @@ int main(void) {
     if (test_memory_arena() != FW_OK) return 1;
     if (test_memory_buffer() != FW_OK) return 1;
     if (test_spsc_ringbuffer() != FW_OK) return 1;
+    if (test_zerowire_stream_resync() != FW_OK) return 1;
 
     printf("\n=== All %d tests passed successfully! ===\n\n", g_tests_passed);
     return 0;

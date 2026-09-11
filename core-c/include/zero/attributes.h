@@ -21,6 +21,8 @@
     #define FW_LIKELY(x) __builtin_expect(!!(x), 1)
     #define FW_UNLIKELY(x) __builtin_expect(!!(x), 0)
     #define FW_UNREACHABLE() __builtin_unreachable()
+    #define FW_COMPILER_BARRIER() __asm__ __volatile__("" ::: "memory")
+    #define FW_MEMORY_BARRIER() __sync_synchronize()
 #elif defined(_MSC_VER)
     #define FW_INLINE static __inline
     #define FW_ALWAYS_INLINE static __forceinline
@@ -32,6 +34,11 @@
     #define FW_LIKELY(x) (x)
     #define FW_UNLIKELY(x) (x)
     #define FW_UNREACHABLE() __assume(0)
+    #define FW_COMPILER_BARRIER() do { \
+        extern void _ReadWriteBarrier(void); \
+        _ReadWriteBarrier(); \
+    } while(0)
+    #define FW_MEMORY_BARRIER() FW_COMPILER_BARRIER()
 #else
     #define FW_INLINE static inline
     #define FW_ALWAYS_INLINE static inline
