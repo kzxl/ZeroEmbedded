@@ -34,10 +34,16 @@ fw_status_t fw_buffer_init(fw_buffer_t *buf, void *storage, fw_size_t capacity);
  */
 fw_status_t fw_buffer_append(fw_buffer_t *buf, const void *src, fw_size_t count);
 
-/**
- * @brief Appends a single byte to the buffer.
- */
-fw_status_t fw_buffer_append_byte(fw_buffer_t *buf, uint8_t byte);
+FW_ALWAYS_INLINE fw_status_t fw_buffer_append_byte(fw_buffer_t *buf, uint8_t byte) {
+    if (FW_UNLIKELY(buf == FW_NULL)) {
+        return FW_ERR_INVALID_ARG;
+    }
+    if (FW_UNLIKELY(buf->length >= buf->capacity)) {
+        return FW_ERR_BUFFER_OVERFLOW;
+    }
+    buf->data[buf->length++] = byte;
+    return FW_OK;
+}
 
 /**
  * @brief Appends a memory span to the buffer.

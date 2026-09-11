@@ -30,16 +30,3 @@ fw_status_t fw_buffer_append(fw_buffer_t *buf, const void *src, fw_size_t count)
 
     return FW_OK;
 }
-
-fw_status_t fw_buffer_append_byte(fw_buffer_t *buf, uint8_t byte) {
-    if (buf == FW_NULL) {
-        return FW_ERR_INVALID_ARG;
-    }
-
-    if (buf->length >= buf->capacity) {
-        return FW_ERR_BUFFER_OVERFLOW;
-    }
-
-    buf->data[buf->length++] = byte;
-    return FW_OK;
-}
