@@ -21,11 +21,14 @@
 #include "hal/gpio.h"
 #include "hal/uart.h"
 #include "hal/timer.h"
+#include "hal/power.h"
+#include "hal/dwt.h"
 #include "protocol/zerowire.h"
+#include "protocol/dispatcher.h"
 #include "rtos/rtos.h"
 
 #define ZERO_EMBEDDED_VERSION_MAJOR 0
-#define ZERO_EMBEDDED_VERSION_MINOR 2
+#define ZERO_EMBEDDED_VERSION_MINOR 3
 #define ZERO_EMBEDDED_VERSION_PATCH 0
 
 #endif /* ZERO_H */

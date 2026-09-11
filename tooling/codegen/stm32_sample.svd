@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<device schemaVersion="1.1" xmlns:xs="http://www.w3.org/2001/XMLSchema-instance" xs:noNamespaceSchemaLocation="CMSIS-SVD.xsd">
+  <name>STM32F401</name>
+  <version>1.0</version>
+  <description>ARM Cortex-M4 Microcontroller with FPU</description>
+  <addressUnitBits>8</addressUnitBits>
+  <width>32</width>
+  <size>32</size>
+  <peripherals>
+    <!-- GPIOA Peripheral -->
+    <peripheral>
+      <name>GPIOA</name>
+      <description>General-purpose I/O Port A</description>
+      <baseAddress>0x40020000</baseAddress>
+      <registers>
+        <register>
+          <name>MODER</name>
+          <description>GPIO port mode register</description>
+          <addressOffset>0x00</addressOffset>
+          <size>32</size>
+        </register>
+        <register>
+          <name>OTYPER</name>
+          <description>GPIO port output type register</description>
+          <addressOffset>0x04</addressOffset>
+          <size>32</size>
+        </register>
+        <register>
+          <name>OSPEEDR</name>
+          <description>GPIO port output speed register</description>
+          <addressOffset>0x08</addressOffset>
+          <size>32</size>
+        </register>
+        <register>
+          <name>PUPDR</name>
+          <description>GPIO port pull-up/pull-down register</description>
+          <addressOffset>0x0C</addressOffset>
+          <size>32</size>
+        </register>
+        <register>
+          <name>IDR</name>
+          <description>GPIO port input data register</description>
+          <addressOffset>0x10</addressOffset>
+          <size>32</size>
+        </register>
+        <register>
+          <name>ODR</name>
+          <description>GPIO port output data register</description>
+          <addressOffset>0x14</addressOffset>
+          <size>32</size>
+        </register>
+        <register>
+          <name>BSRR</name>
+          <description>GPIO port bit set/reset register</description>
+          <addressOffset>0x18</addressOffset>
+          <size>32</size>
+        </register>
+      </registers>
+    </peripheral>
+
+    <!-- USART1 Peripheral -->
+    <peripheral>
+      <name>USART1</name>
+      <description>Universal synchronous asynchronous receiver transmitter</description>
+      <baseAddress>0x40011000</baseAddress>
+      <registers>
+        <register>
+          <name>SR</name>
+          <description>Status register</description>
+          <addressOffset>0x00</addressOffset>
+          <size>32</size>
+        </register>
+        <register>
+          <name>DR</name>
+          <description>Data register</description>
+          <addressOffset>0x04</addressOffset>
+          <size>32</size>
+        </register>
+        <register>
+          <name>BRR</name>
+          <description>Baud rate register</description>
+          <addressOffset>0x08</addressOffset>
+          <size>32</size>
+        </register>
+        <register>
+          <name>CR1</name>
+          <description>Control register 1</description>
+          <addressOffset>0x0C</addressOffset>
+          <size>32</size>
+        </register>
+      </registers>
+    </peripheral>
+  </peripherals>
+</device>

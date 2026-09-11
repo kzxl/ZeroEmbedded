@@ -59,6 +59,20 @@ typedef struct {
 
 static node_stats_t g_stats = {0, 0, 0, 0, 0, 0, FW_TRUE};
 
+/* ZeroWire RPC Command Table */
+static fw_status_t rpc_ping_handler(uint8_t seq, fw_cspan_t req, fw_span_t resp, fw_size_t *resp_len) {
+    (void)seq; (void)req;
+    const char *pong = "PONG_FROM_NODE";
+    memcpy(resp.data, pong, 14);
+    *resp_len = 14;
+    return FW_OK;
+}
+
+static const fw_cmd_entry_t s_rpc_entries[] = {
+    { MSG_CMD_PING, 0, rpc_ping_handler }
+};
+static fw_cmd_table_t s_rpc_table;
+
 /* External mock injection helper from uart.c */
 extern void fw_uart_mock_inject_rx(fw_uart_t *uart, uint8_t byte);
 extern fw_bool_t fw_uart_mock_extract_tx(fw_uart_t *uart, uint8_t *out_byte);
@@ -146,6 +160,22 @@ static void service_uart_rx_stream(void) {
     fw_status_t st = fw_zerowire_stream_sync(stream_slice, &rx_frame, &consumed);
     if (st == FW_OK) {
         g_stats.packets_received++;
+        /* Check RPC Dispatcher for Request-Response routing */
+        fw_zerowire_frame_t rpc_reply;
+        fw_bool_t has_reply = FW_FALSE;
+        fw_status_t rpc_st = fw_cmd_dispatch(&s_rpc_table, &rx_frame, &rpc_reply, &has_reply);
+
+        if (rpc_st == FW_OK && has_reply) {
+            uint8_t reply_raw[64];
+            fw_span_t reply_span = FW_SPAN_FROM_ARRAY(reply_raw);
+            fw_size_t encoded = fw_zerowire_encode(&rpc_reply, reply_span);
+            if (encoded > 0) {
+                fw_uart_write(&s_device_uart, fw_cspan_make(reply_raw, encoded));
+                printf("  \033[1;36m[RPC DISPATCHER] Auto-routed MsgID 0x%02X -> Sent RPC Reply 0x%02X ('%.*s')\033[0m\n",
+                    rx_frame.msg_id, rpc_reply.msg_id, rpc_reply.length, rpc_reply.payload);
+            }
+        }
+
         /* Post tasklet to superloop queue without blocking interrupt or stream */
         uint32_t arg = ((uint32_t)rx_frame.seq << 8) | rx_frame.msg_id;
         fw_tasklet_post(&s_tasklet_q, on_packet_processed_tasklet, FW_NULL, arg);
@@ -203,9 +233,16 @@ static void print_banner(void) {
 }
 
 static void print_diagnostics(void) {
+    fw_pm_metrics_t pm;
+    fw_pm_get_metrics(&pm);
+
     printf("\n\033[1;35m>>> [SYSTEM DIAGNOSTICS SNAPSHOT] <<<\033[0m\n");
     printf("  * System Uptime          : %u ms (%.2f s)\n", fw_timer_get_millis(), (float)fw_timer_get_millis() / 1000.0f);
     printf("  * Superloop Iterations   : %u loops (~%u loops/sec)\n", g_stats.superloop_iterations, g_stats.loops_per_sec);
+    printf("  * CPU Duty Cycle (Load)  : %.2f%% (Sleep: %llu us, Active: %llu us)\n",
+        (double)pm.cpu_load_permille / 10.0,
+        (unsigned long long)pm.total_sleep_us,
+        (unsigned long long)pm.total_active_us);
     printf("  * Memory Pool Capacity   : %zu blocks total (%zu available, %zu in-use)\n",
         fw_pool_capacity(&s_telemetry_pool),
         fw_pool_available(&s_telemetry_pool),
@@ -229,6 +266,7 @@ int main(int argc, char **argv) {
     }
 
     /* 1. Hardware & Framework Subsystems Initialization */
+    fw_pm_init();
     fw_gpio_init(LED_HEARTBEAT);
     fw_gpio_write(LED_HEARTBEAT, FW_FALSE);
 
@@ -240,6 +278,7 @@ int main(int argc, char **argv) {
     fw_uart_init(&s_device_uart, (void*)0x40004400, &uart_cfg, &s_uart_tx_q, &s_uart_rx_q);
 
     fw_tasklet_queue_init(&s_tasklet_q, s_tasklet_items, TASKLET_CAPACITY);
+    fw_cmd_table_init(&s_rpc_table, s_rpc_entries, 1);
 
     print_banner();
 
@@ -406,8 +445,8 @@ int main(int argc, char **argv) {
         }
 #endif
 
-        /* F. Small cooperative yield sleep (1ms) to keep host CPU usage low */
-        fw_delay_millis(1);
+        /* F. Ultra-low power idle sleep (WFI on ARM Cortex-M / Yield on host) */
+        fw_pm_enter_sleep(1);
     }
 
     print_diagnostics();

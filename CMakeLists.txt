@@ -22,6 +22,10 @@ if(ZERO_BUILD_TESTS)
     add_executable(test_hal_and_tasklet tests/test_hal_and_tasklet.c)
     target_link_libraries(test_hal_and_tasklet PRIVATE Zero::core_c)
     add_test(NAME HalAndTaskletTests COMMAND test_hal_and_tasklet)
+
+    add_executable(test_advanced tests/test_advanced.c)
+    target_link_libraries(test_advanced PRIVATE Zero::core_c)
+    add_test(NAME AdvancedFeatureTests COMMAND test_advanced)
 endif()
 
 # 3. Comprehensive Performance Benchmark Suite

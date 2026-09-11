@@ -16,6 +16,8 @@ add_library(zero_core_c STATIC
     src/uart.c
     src/tasklet.c
     src/rtos_baremetal.c
+    src/power.c
+    src/dispatcher.c
 )
 
 add_library(Zero::core_c ALIAS zero_core_c)

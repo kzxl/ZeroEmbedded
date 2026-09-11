@@ -241,6 +241,94 @@ void receive_stream(fw_uart_t *uart) {
 
 ---
 
+### 3.7 ZeroWire Binary RPC & Command Dispatcher (`fw_cmd_table_t`)
+Deterministic Request-Response routing with zero heap allocation. Automatically dispatches incoming command frames to registered handlers and generates response frames with `0x80 | req_msg_id`.
+
+```c
+#include "zero/zero.h"
+
+#define CMD_PING 0x10
+
+static fw_status_t ping_handler(uint8_t seq, fw_cspan_t req, fw_span_t resp, fw_size_t *resp_len) {
+    (void)seq; (void)req;
+    const char *pong = "PONG";
+    memcpy(resp.data, pong, 4);
+    *resp_len = 4;
+    return FW_OK;
+}
+
+static const fw_cmd_entry_t s_commands[] = {
+    { CMD_PING, 0, ping_handler }
+};
+static fw_cmd_table_t s_cmd_table;
+
+void app_setup(void) {
+    fw_cmd_table_init(&s_cmd_table, s_commands, 1);
+}
+
+void on_frame_received(const fw_zerowire_frame_t *rx_frame, fw_uart_t *uart) {
+    fw_zerowire_frame_t reply_frame;
+    fw_bool_t has_reply = FW_FALSE;
+
+    if (fw_cmd_dispatch(&s_cmd_table, rx_frame, &reply_frame, &has_reply) == FW_OK && has_reply) {
+        uint8_t out[64];
+        fw_size_t encoded = fw_zerowire_encode(&reply_frame, FW_SPAN_FROM_ARRAY(out));
+        fw_uart_write(uart, fw_cspan_make(out, encoded));
+    }
+}
+```
+
+---
+
+### 3.8 Ultra-Low Power Management & Duty-Cycle Profiling (`fw_pm_t`)
+Provides tickless idle management with hardware WFI (`__WFI()`) on ARM Cortex-M and high-resolution sleep accounting on host simulation, tracking live CPU load permille.
+
+```c
+#include "zero/zero.h"
+
+void system_init(void) {
+    fw_pm_init();
+}
+
+void idle_task(void) {
+    // Enters low-power sleep mode until interrupt occurs
+    fw_pm_enter_sleep(1);
+
+    // Read real-time duty cycle & power consumption metrics
+    fw_pm_metrics_t pm;
+    fw_pm_get_metrics(&pm);
+    // pm.cpu_load_permille is 0..1000 (e.g. 5 = 0.5% CPU load)
+}
+```
+
+---
+
+### 3.9 Cycle-Accurate Profiling (`fw_dwt_t`)
+Leverages ARM Cortex-M DWT (`DWT->CYCCNT`) or x86/x64 RDTSC hardware cycle counters for micro-benchmarking and cycle-accurate execution profiling.
+
+```c
+#include "zero/zero.h"
+
+void profile_critical_section(void) {
+    fw_dwt_init();
+
+    uint32_t c_start = fw_dwt_get_cycles();
+    // Execute critical real-time section...
+    uint32_t cycles = fw_dwt_get_cycles() - c_start;
+}
+```
+
+---
+
+### 3.10 CMSIS-SVD Register Generator (`svd_codegen.py`)
+Parses official silicon vendor CMSIS-SVD XML files (from ST, TI, NXP, Nordic) into type-safe, MISRA-compliant `volatile` register structures and bitfield macros:
+
+```bash
+python tooling/codegen/svd_codegen.py --svd tooling/codegen/stm32_sample.svd --out-dir hal/
+```
+
+---
+
 ## 4. Complete Firmware Application Template
 
 The following template represents a production-ready bare-metal firmware archetype incorporating all subsystems:
