@@ -502,6 +502,50 @@ void app_verify_and_confirm(void) {
 
 ---
 
+### 3.17 Deferred Lock-Free Binary Logger (`fw_log_t`)
+Pushes fixed-size event descriptors into a lock-free queue in < 25 ns, eliminating UART blocking and standard `printf()` delays inside ISRs. Drains and formats in the background superloop:
+
+```c
+#include "zero/zero.h"
+
+static fw_log_entry_t s_log_storage[32];
+
+void logging_setup(void) {
+    // Routes formatted logs to hardware UART callback
+    fw_log_init(bsp_uart_print, s_log_storage, 32);
+}
+
+// Can be safely called from ISR! (Takes < 25 ns)
+FW_ISR void USART1_IRQHandler(void) {
+    FW_LOG_D("UART", "Byte received: 0x%02X", rx_byte);
+}
+
+void superloop(void) {
+    // Drains and formats pending log items when CPU is idle
+    fw_log_flush(0);
+}
+```
+
+---
+
+### 3.18 Zero-Heap Embedded Cryptography (`zero/crypto`)
+Standards-compliant, zero-dynamic-memory cryptographic primitives operating entirely on stack contexts:
+
+```c
+#include "zero/zero.h"
+
+// 1. NIST SHA-256 One-Shot Digest
+uint8_t hash[32];
+fw_sha256_digest(firmware_image, image_size, hash);
+
+// 2. RFC 8439 ChaCha20 Stream Encryption / Decryption
+fw_chacha20_ctx_t cipher;
+fw_chacha20_init(&cipher, secret_key_32b, nonce_12b, 1);
+fw_chacha20_crypt(&cipher, plaintext, ciphertext, payload_len);
+```
+
+---
+
 ## 4. Complete Firmware Application Template
 
 The following template represents a production-ready bare-metal firmware archetype incorporating all subsystems:

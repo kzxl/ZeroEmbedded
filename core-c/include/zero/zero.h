@@ -32,10 +32,13 @@
 #include "storage/flash.h"
 #include "storage/nvs.h"
 #include "storage/ota.h"
+#include "diag/log.h"
+#include "crypto/sha256.h"
+#include "crypto/chacha20.h"
 #include "rtos/rtos.h"
 
 #define ZERO_EMBEDDED_VERSION_MAJOR 0
-#define ZERO_EMBEDDED_VERSION_MINOR 6
+#define ZERO_EMBEDDED_VERSION_MINOR 7
 #define ZERO_EMBEDDED_VERSION_PATCH 0
 
 #endif /* ZERO_H */

@@ -38,6 +38,10 @@ if(ZERO_BUILD_TESTS)
     add_executable(test_resiliency tests/test_resiliency.c)
     target_link_libraries(test_resiliency PRIVATE Zero::core_c)
     add_test(NAME ResiliencyTests COMMAND test_resiliency)
+
+    add_executable(test_observability_and_crypto tests/test_observability_and_crypto.c)
+    target_link_libraries(test_observability_and_crypto PRIVATE Zero::core_c)
+    add_test(NAME ObservabilityAndCryptoTests COMMAND test_observability_and_crypto)
 endif()
 
 # 3. Comprehensive Performance Benchmark Suite

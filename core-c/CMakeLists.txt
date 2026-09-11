@@ -24,6 +24,9 @@ add_library(zero_core_c STATIC
     src/nvs.c
     src/crash_dump.c
     src/ota.c
+    src/log.c
+    src/sha256.c
+    src/chacha20.c
 )
 
 add_library(Zero::core_c ALIAS zero_core_c)
