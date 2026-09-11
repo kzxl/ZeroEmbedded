@@ -22,6 +22,8 @@ add_library(zero_core_c STATIC
     src/fsm.c
     src/filter.c
     src/nvs.c
+    src/crash_dump.c
+    src/ota.c
 )
 
 add_library(Zero::core_c ALIAS zero_core_c)

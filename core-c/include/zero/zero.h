@@ -24,16 +24,18 @@
 #include "hal/power.h"
 #include "hal/dwt.h"
 #include "hal/watchdog.h"
+#include "hal/crash_dump.h"
 #include "protocol/zerowire.h"
 #include "protocol/dispatcher.h"
 #include "fsm/fsm.h"
 #include "dsp/filter.h"
 #include "storage/flash.h"
 #include "storage/nvs.h"
+#include "storage/ota.h"
 #include "rtos/rtos.h"
 
 #define ZERO_EMBEDDED_VERSION_MAJOR 0
-#define ZERO_EMBEDDED_VERSION_MINOR 5
+#define ZERO_EMBEDDED_VERSION_MINOR 6
 #define ZERO_EMBEDDED_VERSION_PATCH 0
 
 #endif /* ZERO_H */

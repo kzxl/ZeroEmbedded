@@ -34,6 +34,10 @@ if(ZERO_BUILD_TESTS)
     add_executable(test_storage tests/test_storage.c)
     target_link_libraries(test_storage PRIVATE Zero::core_c)
     add_test(NAME StorageTests COMMAND test_storage)
+
+    add_executable(test_resiliency tests/test_resiliency.c)
+    target_link_libraries(test_resiliency PRIVATE Zero::core_c)
+    add_test(NAME ResiliencyTests COMMAND test_resiliency)
 endif()
 
 # 3. Comprehensive Performance Benchmark Suite

@@ -441,6 +441,67 @@ void load_device_serial(char *out_buf, fw_size_t buf_size) {
 
 ---
 
+### 3.15 CPU HardFault Crash Dump Capturer (`fw_crash_dump_t`)
+Captures registers and fault status words into uninitialized retention memory (`.noinit` section) during HardFaults, enabling post-reset diagnosis without a JTAG debugger:
+
+```c
+#include "zero/zero.h"
+
+// Dedicated retention RAM preserved across watchdog / software resets
+static uint8_t s_retention_ram[sizeof(fw_crash_dump_t)];
+
+void system_boot_check(void) {
+    fw_crash_dump_init(s_retention_ram, sizeof(s_retention_ram));
+
+    // Check if system reset was caused by a prior HardFault
+    if (fw_crash_dump_has_valid()) {
+        fw_crash_dump_t dump;
+        fw_crash_dump_get(&dump);
+
+        char report[512];
+        fw_crash_dump_format_report(&dump, report, sizeof(report));
+        // Transmit diagnostic crash report over UART/LTE modem!
+        bsp_uart_print(report);
+
+        // Clear dump once recorded
+        fw_crash_dump_clear();
+    }
+}
+```
+
+---
+
+### 3.16 Dual-Bank Bootloader & OTA Lifecycle Engine (`fw_ota_t`)
+Five-stage fail-safe firmware upgrade state machine with image CRC32 validation and automatic watchdog rollback:
+
+```c
+#include "zero/zero.h"
+
+static fw_ota_t s_ota;
+
+void ota_setup(const fw_flash_driver_t *flash_bsp) {
+    // Mounts metadata descriptor at flash address 0x08008000
+    fw_ota_init(&s_ota, flash_bsp, 0x08008000);
+}
+
+// Called by Application after completing diagnostics
+void app_verify_and_confirm(void) {
+    fw_app_desc_t desc;
+    fw_ota_get_desc(&s_ota, &desc);
+
+    if (desc.state == FW_OTA_STATE_PENDING_VERIFY) {
+        // Run application self-test (sensor bus check, network check)...
+        if (bsp_self_test_passed()) {
+            fw_ota_confirm(&s_ota); // Mark CONFIRMED! Image is now permanently active.
+        } else {
+            fw_ota_rollback(&s_ota); // Trigger rollback to previous stable bank!
+        }
+    }
+}
+```
+
+---
+
 ## 4. Complete Firmware Application Template
 
 The following template represents a production-ready bare-metal firmware archetype incorporating all subsystems:
