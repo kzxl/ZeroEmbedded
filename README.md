@@ -77,7 +77,16 @@ ctest --test-dir build -C Release --output-on-failure
 python tooling/analyzer/zero_analyzer.py core-c examples
 ```
 
-### 4. Run Demonstrations
+### 4. Run Interactive Real-Time Edge Node Console Demo
+```powershell
+# Run interactive live console (Hotkeys: [1] LED, [2] Telemetry, [3] PING, [4] Stress, [5] Noise, [s] Stats, [q] Quit)
+powershell -ExecutionPolicy Bypass -File scripts/run_demo.ps1
+
+# Or run directly with automated sequence:
+.\build\Release\zero_device_demo.exe --auto
+```
+
+### 5. Other Demonstrations & Benchmarks
 ```bash
 # Host Simulator (Virtual GPIO, UART Loopback, and Tasklet Dispatcher)
 .\build\Release\example_host_sim.exe
