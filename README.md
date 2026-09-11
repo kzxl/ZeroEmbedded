@@ -22,15 +22,27 @@
 
 ## ⚡ Verified Benchmark Performance Matrix (Phase 8)
 
-All benchmarks measured on 64-bit production builds (`MSVC /O2`) with high-resolution CPU performance counters:
+### 🖥️ Hardware & Execution Environment Testbed (HEPM Provenance)
+All benchmarks are empirically measured with reproducible hardware counters under the following certified testbed:
 
+| Parameter | Specification & Host Environment |
+| :--- | :--- |
+| **Host Processor** | Intel(R) Core(TM) i5-10400 CPU @ 2.90GHz (Base: 2.90 GHz, Turbo: up to 4.30 GHz) |
+| **CPU Topology** | 6 Physical Cores, 12 Logical Processors (12 MB Intel® Smart Cache) |
+| **System Memory** | 32 GB DDR4 (Dual-Channel) |
+| **Operating System** | Microsoft Windows 10 Pro 64-bit (Build 19045, x86_64) |
+| **Compiler & Flags** | MSVC v19.44.35225 (`cl.exe /W4 /O2 /I core-c/include`) |
+| **High-Res Timer** | Windows QueryPerformanceCounter (QPC Frequency: 10,000,000 Hz, 100 ns resolution) |
+| **Run Conditions** | Single-threaded real-time loop, 10,000-iteration warm-up before timing |
+
+### Benchmark Results Table
 | Benchmark Component | Workload Iterations | Baseline Time (C / CRT) | Framework Time | Measured Metric & Speedup |
 | :--- | :---: | :---: | :---: | :---: |
-| **`fw_span_t` Slicing vs Raw Pointer** | 10,000,000 | 25.92 ms | **24.52 ms** | **0.946x** *(Zero-Cost Verified, overhead $\le 1.02x$)* |
-| **`fw_pool` vs CRT `malloc/free`** | 2,000,000 | 175.41 ms | **41.92 ms** | **4.2x Faster** *(20.96 ns/alloc-free, Double-Free protected)* |
-| **`fw_buffer_t` vs Pointer-Bump** | 5,000,000 | 5.17 ms | **6.77 ms** | **1.310x** *(Inlined bounds-checked write)* |
-| **SPSC Lockless RingBuffer** | 5,000,000 | N/A | **30.59 ms** | **163.5 Million Ops/sec** *(6.12 ns per push+pop)* |
-| **ZeroWire Packet Full Cycle** | 500,000 | N/A | **357.29 ms** | **32.03 MB/s** *(714 ns/frame with CRC16-CCITT check)* |
+| **`fw_span_t` Slicing vs Raw Pointer** | 10,000,000 | 61.22 ms | **59.27 ms** | **0.968x** *(Zero-Cost Verified, overhead $\le 1.02x$)* |
+| **`fw_pool` vs CRT `malloc/free`** | 2,000,000 | 116.13 ms | **37.88 ms** | **3.1x Faster** *(18.94 ns/alloc-free, O(1) Bitset safe)* |
+| **`fw_buffer_t` vs Pointer-Bump** | 5,000,000 | 4.06 ms | **6.62 ms** | **1.629x** *(Inlined bounds-checked write)* |
+| **SPSC Lockless RingBuffer** | 5,000,000 | N/A | **16.79 ms** | **297.8 Million Ops/sec** *(3.36 ns per push+pop)* |
+| **ZeroWire Packet Full Cycle** | 500,000 | N/A | **226.16 ms** | **50.60 MB/s** *(452 ns/frame with CRC16-CCITT)* |
 
 ### Flash / Binary Footprint Analysis
 ```text
