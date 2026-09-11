@@ -9,6 +9,7 @@ add_library(zero_core_c STATIC
     src/pool.c
     src/arena.c
     src/buffer.c
+    src/spsc.c
 )
 
 target_include_directories(zero_core_c PUBLIC

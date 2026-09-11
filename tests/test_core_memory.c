@@ -173,6 +173,51 @@ static fw_status_t test_memory_buffer(void) {
     return FW_OK;
 }
 
+/* ========================================================================== */
+/* Test 6: Lock-Free SPSC RingBuffer (ISR-Safe)                               */
+/* ========================================================================== */
+static fw_status_t test_spsc_ringbuffer(void) {
+    uint8_t storage[8];
+    fw_spsc_t q;
+
+    TEST_ASSERT(fw_spsc_init(&q, storage, 7) == FW_ERR_INVALID_ARG, "Non-power-of-2 capacity rejected");
+    TEST_ASSERT(fw_spsc_init(&q, storage, 8) == FW_OK, "Init power-of-2 capacity ok");
+    TEST_ASSERT(fw_spsc_is_empty(&q), "Initially empty");
+    TEST_ASSERT(fw_spsc_available(&q) == 8, "8 slots available");
+
+    /* Push 8 items to fill */
+    for (uint8_t i = 1; i <= 8; ++i) {
+        TEST_ASSERT(fw_spsc_push(&q, i) == FW_OK, "Push ok");
+    }
+    TEST_ASSERT(fw_spsc_is_full(&q), "Queue must be full");
+    TEST_ASSERT(fw_spsc_push(&q, 99) == FW_ERR_BUFFER_OVERFLOW, "Overflow rejected");
+
+    /* Pop 4 items */
+    for (uint8_t i = 1; i <= 4; ++i) {
+        uint8_t val = 0;
+        TEST_ASSERT(fw_spsc_pop(&q, &val) == FW_OK, "Pop ok");
+        TEST_ASSERT(val == i, "FIFO order preserved");
+    }
+    TEST_ASSERT(!fw_spsc_is_full(&q), "No longer full");
+    TEST_ASSERT(fw_spsc_count(&q) == 4, "4 items remain");
+
+    /* Push 4 more to wrap around boundary */
+    for (uint8_t i = 9; i <= 12; ++i) {
+        TEST_ASSERT(fw_spsc_push(&q, i) == FW_OK, "Push wrapped ok");
+    }
+    TEST_ASSERT(fw_spsc_is_full(&q), "Full again after wrap");
+
+    /* Read remaining in bulk */
+    uint8_t out[8] = {0};
+    fw_size_t read_bytes = fw_spsc_read(&q, out, sizeof(out));
+    TEST_ASSERT(read_bytes == 8, "Read 8 bytes in bulk");
+    TEST_ASSERT(out[0] == 5 && out[1] == 6 && out[2] == 7 && out[3] == 8, "First batch correct");
+    TEST_ASSERT(out[4] == 9 && out[5] == 10 && out[6] == 11 && out[7] == 12, "Wrapped batch correct");
+    TEST_ASSERT(fw_spsc_is_empty(&q), "Queue empty after full read");
+
+    return FW_OK;
+}
+
 int main(void) {
     printf("\n--- Running ZeroEmbedded Phase 1 & 2 Test Suite ---\n");
 
@@ -181,6 +226,7 @@ int main(void) {
     if (test_memory_pool() != FW_OK) return 1;
     if (test_memory_arena() != FW_OK) return 1;
     if (test_memory_buffer() != FW_OK) return 1;
+    if (test_spsc_ringbuffer() != FW_OK) return 1;
 
     printf("\n=== All %d tests passed successfully! ===\n\n", g_tests_passed);
     return 0;

@@ -87,6 +87,9 @@
 #define FW_INIT FW_ANNOTATE("zero::context::init")
 
 /** Standard thread / main loop context */
+#ifdef FW_NORMAL
+    #undef FW_NORMAL
+#endif
 #define FW_NORMAL FW_ANNOTATE("zero::context::normal")
 
 #endif /* ZERO_ATTRIBUTES_H */
