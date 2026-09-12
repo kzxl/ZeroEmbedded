@@ -22,11 +22,17 @@
     #define FW_UNLIKELY(x) __builtin_expect(!!(x), 0)
     #define FW_UNREACHABLE() __builtin_unreachable()
     #define FW_COMPILER_BARRIER() __asm__ __volatile__("" ::: "memory")
-    #if defined(__arm__) || defined(__thumb__)
+    #if defined(__ARM_ARCH_5TE__) || defined(__ARM_ARCH_5T__) || defined(__ARM_ARCH_4T__) || (defined(__ARM_ARCH) && __ARM_ARCH < 7)
+        /* ARM pre-v7 (ARM946E-S, etc.): CP15 Drain Write Buffer */
+        #define FW_MEMORY_BARRIER()   __asm__ __volatile__("mcr p15, 0, %0, c7, c10, 4" :: "r"(0) : "memory")
+    #elif defined(__arm__) || defined(__thumb__)
         #define FW_MEMORY_BARRIER()   __asm__ __volatile__("dmb 0xF" ::: "memory")
+    #elif defined(__riscv)
+        #define FW_MEMORY_BARRIER()   __asm__ __volatile__("fence rw, rw" ::: "memory")
     #else
         #define FW_MEMORY_BARRIER()   __sync_synchronize()
     #endif
+    #define FW_CACHE_ALIGNED(n)       FW_ALIGNED(n)
 #elif defined(_MSC_VER)
     #define FW_INLINE static __inline
     #define FW_ALWAYS_INLINE static __forceinline
@@ -56,6 +62,7 @@
         #define FW_COMPILER_BARRIER() do {} while(0)
         #define FW_MEMORY_BARRIER()   do {} while(0)
     #endif
+    #define FW_CACHE_ALIGNED(n)       FW_ALIGNED(n)
 #else
     #define FW_INLINE static inline
     #define FW_ALWAYS_INLINE static inline
@@ -64,6 +71,7 @@
     #define FW_RESTRICT
     #define FW_PACKED
     #define FW_ALIGNED(n)
+    #define FW_CACHE_ALIGNED(n)
     #define FW_LIKELY(x) (x)
     #define FW_UNLIKELY(x) (x)
     #define FW_UNREACHABLE() do {} while(0)

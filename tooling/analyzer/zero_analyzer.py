@@ -15,6 +15,11 @@ FORBIDDEN_ISR_CALLS = {
     "calloc": "ZE-001: Dynamic memory allocation is strictly prohibited inside ISR",
     "realloc": "ZE-001: Dynamic memory allocation is strictly prohibited inside ISR",
     "free": "ZE-001: Heap deallocation is strictly prohibited inside ISR",
+    "fio_malloc": "ZE-001: DryOS/ML fio_malloc is strictly prohibited inside ISR",
+    "shoot_malloc": "ZE-001: DryOS/ML shoot_malloc is strictly prohibited inside ISR",
+    "srm_malloc": "ZE-001: DryOS/ML srm_malloc is strictly prohibited inside ISR",
+    "tmp_malloc": "ZE-001: DryOS/ML tmp_malloc is strictly prohibited inside ISR",
+    "AllocateMemory": "ZE-001: Canon DryOS AllocateMemory is strictly prohibited inside ISR",
     # Blocking Delays & Sleeps
     "delay": "ZE-002: Blocking delay cannot be called inside ISR",
     "delay_ms": "ZE-002: Blocking delay cannot be called inside ISR",
@@ -22,14 +27,17 @@ FORBIDDEN_ISR_CALLS = {
     "fw_task_delay_ms": "ZE-002: RTOS task delay cannot be called inside ISR",
     "sleep": "ZE-002: Sleep/wait cannot be called inside ISR",
     "usleep": "ZE-002: Sleep/wait cannot be called inside ISR",
+    "msleep": "ZE-002: DryOS msleep cannot be called inside ISR",
     "vTaskDelay": "ZE-002: RTOS task delay cannot be called inside ISR",
     # Blocking Synchronization & Mutexes (Deadlock hazard in ISR)
     "fw_mutex_lock": "ZE-003: Blocking mutex acquire is strictly prohibited inside ISR",
     "xSemaphoreTake": "ZE-003: Blocking semaphore acquire is strictly prohibited inside ISR",
     "pthread_mutex_lock": "ZE-003: Blocking mutex acquire is strictly prohibited inside ISR",
+    "take_semaphore": "ZE-003: DryOS take_semaphore cannot be called inside ISR",
     # Non-reentrant / Unbounded Standard I/O
     "printf": "ZE-004: Non-reentrant standard I/O is prohibited inside ISR",
     "sprintf": "ZE-004: Unbounded string formatting is prohibited inside ISR",
+    "bmp_printf": "ZE-004: ML GUI bmp_printf is prohibited inside ISR",
 }
 
 class Diagnostic:

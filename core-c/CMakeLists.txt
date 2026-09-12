@@ -27,6 +27,13 @@ add_library(zero_core_c STATIC
     src/log.c
     src/sha256.c
     src/chacha20.c
+    src/hal/cache.c
+    src/init.c
+    src/hub.c
+    src/hook.c
+    src/hal/dma.c
+    src/monitor.c
+    src/boot_guard.c
 )
 
 add_library(Zero::core_c ALIAS zero_core_c)

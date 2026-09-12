@@ -36,6 +36,13 @@
 #include "crypto/sha256.h"
 #include "crypto/chacha20.h"
 #include "rtos/rtos.h"
+#include "init.h"
+#include "memory/hub.h"
+#include "sync/hook.h"
+#include "hal/cache.h"
+#include "hal/dma.h"
+#include "rtos/monitor.h"
+#include "diag/boot_guard.h"
 
 #define ZERO_EMBEDDED_VERSION_MAJOR 0
 #define ZERO_EMBEDDED_VERSION_MINOR 7
