@@ -5,6 +5,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <assert.h>
 #include "zero/zero.h"
 
@@ -61,6 +64,19 @@ static void test_deferred_logger(void) {
     fw_size_t flood_flushed = fw_log_flush(0);
     assert(flood_flushed > 0 && flood_flushed < LOG_STORAGE_CAPACITY);
 
+    /* 4. Test compile-time level variadic macros FW_LOG_E/W/I/D with 0, 1, 2 args */
+    s_captured_len = 0;
+    memset(s_captured_log_output, 0, sizeof(s_captured_log_output));
+    FW_LOG_I("SYS", "Boot OK");
+    FW_LOG_W("NET", "Retry %u", 3);
+    FW_LOG_E("BUS", "Err 0x%02X ch=%u", 0x5A, 2);
+    FW_LOG_D("DBG", "Tick %u", 42);
+    assert(fw_log_flush(0) == 4);
+    assert(strstr(s_captured_log_output, "Boot OK") != FW_NULL);
+    assert(strstr(s_captured_log_output, "Retry 3") != FW_NULL);
+    assert(strstr(s_captured_log_output, "Err 0x5A ch=2") != FW_NULL);
+    assert(strstr(s_captured_log_output, "Tick 42") != FW_NULL);
+
     printf("  -> Deferred logger passed! (Non-blocking queue and sink verified)\n");
 }
 
@@ -103,6 +119,7 @@ static void test_sha256_nist_vectors(void) {
     fw_sha256_update(&ctx, "b", 1);
     fw_sha256_update(&ctx, "c", 1);
     fw_sha256_final(&ctx, digest);
+    assert(ctx.state[0] == 0 && ctx.bit_count == 0);
     bytes_to_hex(digest, sizeof(digest), hex);
     assert(strcmp(hex, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad") == 0);
 
@@ -151,6 +168,33 @@ static void test_chacha20_encryption(void) {
 
     /* Decrypted plaintext must match original exactly */
     assert(memcmp(decrypted, secret_msg, msg_len) == 0);
+
+    /* 3. Multi-block (140 bytes) aligned vs unaligned XOR path equivalence */
+    FW_ALIGNED(4) uint8_t multi_plain[144];
+    FW_ALIGNED(4) uint8_t multi_aligned_ct[144];
+    FW_ALIGNED(4) uint8_t multi_unaligned_ct[144];
+    FW_ALIGNED(4) uint8_t multi_dec[144];
+    const fw_size_t multi_len = 140;
+
+    for (fw_size_t i = 0; i < multi_len; ++i) {
+        multi_plain[i] = (uint8_t)((i * 7U) ^ 0xA5U);
+    }
+
+    fw_chacha20_init(&enc_ctx, key, nonce, 2);
+    fw_chacha20_crypt(&enc_ctx, multi_plain, multi_aligned_ct, multi_len);
+
+    /* Offset source & dest by +1 byte to force unaligned fallback */
+    uint8_t unaligned_src[144];
+    memcpy(unaligned_src + 1, multi_plain, multi_len);
+    fw_chacha20_init(&enc_ctx, key, nonce, 2);
+    fw_chacha20_crypt(&enc_ctx, unaligned_src + 1, multi_unaligned_ct + 1, multi_len);
+    assert(memcmp(multi_aligned_ct, multi_unaligned_ct + 1, multi_len) == 0);
+
+    /* In-place aligned decryption */
+    memcpy(multi_dec, multi_aligned_ct, multi_len);
+    fw_chacha20_init(&dec_ctx, key, nonce, 2);
+    fw_chacha20_crypt(&dec_ctx, multi_dec, multi_dec, multi_len);
+    assert(memcmp(multi_dec, multi_plain, multi_len) == 0);
 
     printf("  -> ChaCha20 cipher passed! (End-to-end stream encryption verified)\n");
 }

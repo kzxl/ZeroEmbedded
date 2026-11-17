@@ -27,13 +27,14 @@ fw_status_t fw_spsc_push(fw_spsc_t *spsc, uint8_t byte) {
 
     fw_size_t head = spsc->head;
     fw_size_t tail = spsc->tail;
+    FW_ACQUIRE_BARRIER();
 
     if ((head - tail) >= spsc->capacity) {
         return FW_ERR_BUFFER_OVERFLOW;
     }
 
     spsc->buffer[head & spsc->mask] = byte;
-    FW_MEMORY_BARRIER();
+    FW_RELEASE_BARRIER();
     spsc->head = head + 1;
 
     return FW_OK;
@@ -45,15 +46,15 @@ fw_status_t fw_spsc_pop(fw_spsc_t *spsc, uint8_t *out_byte) {
     }
 
     fw_size_t tail = spsc->tail;
-    FW_MEMORY_BARRIER();
     fw_size_t head = spsc->head;
+    FW_ACQUIRE_BARRIER();
 
     if (tail == head) {
         return FW_ERR_NOT_FOUND; /* Empty */
     }
 
     *out_byte = spsc->buffer[tail & spsc->mask];
-    FW_MEMORY_BARRIER();
+    FW_RELEASE_BARRIER();
     spsc->tail = tail + 1;
 
     return FW_OK;
@@ -67,6 +68,7 @@ fw_size_t fw_spsc_write(fw_spsc_t *spsc, const void *src, fw_size_t count) {
     const uint8_t *in = (const uint8_t*)src;
     fw_size_t head = spsc->head;
     fw_size_t tail = spsc->tail;
+    FW_ACQUIRE_BARRIER();
     fw_size_t available = spsc->capacity - (head - tail);
     fw_size_t to_write = count < available ? count : available;
     if (to_write == 0) {
@@ -86,7 +88,7 @@ fw_size_t fw_spsc_write(fw_spsc_t *spsc, const void *src, fw_size_t count) {
         memcpy(spsc->buffer, in + chunk1, chunk2);
     }
 
-    FW_MEMORY_BARRIER();
+    FW_RELEASE_BARRIER();
     spsc->head = head + to_write;
     return to_write;
 }
@@ -98,8 +100,8 @@ fw_size_t fw_spsc_read(fw_spsc_t *spsc, void *dst, fw_size_t max_count) {
 
     uint8_t *out = (uint8_t*)dst;
     fw_size_t tail = spsc->tail;
-    FW_MEMORY_BARRIER();
     fw_size_t head = spsc->head;
+    FW_ACQUIRE_BARRIER();
     fw_size_t count = (head - tail);
     fw_size_t to_read = max_count < count ? max_count : count;
     if (to_read == 0) {
@@ -119,7 +121,7 @@ fw_size_t fw_spsc_read(fw_spsc_t *spsc, void *dst, fw_size_t max_count) {
         memcpy(out + chunk1, spsc->buffer, chunk2);
     }
 
-    FW_MEMORY_BARRIER();
+    FW_RELEASE_BARRIER();
     spsc->tail = tail + to_read;
     return to_read;
 }

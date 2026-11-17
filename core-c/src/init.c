@@ -21,10 +21,21 @@ fw_status_t fw_init_register(const char *name, fw_init_fn_t fn, uint8_t level, u
         }
     }
 
-    s_init_entries[s_init_count].name = name ? name : "unnamed_init";
-    s_init_entries[s_init_count].init_fn = fn;
-    s_init_entries[s_init_count].level = level;
-    s_init_entries[s_init_count].priority = priority;
+    /* Insert sorted by (level, priority) ascending so fw_init_level runs without sorting */
+    fw_size_t ins = s_init_count;
+    while (ins > 0U) {
+        const fw_init_entry_t *prev = &s_init_entries[ins - 1U];
+        if (prev->level < level || (prev->level == level && prev->priority <= priority)) {
+            break;
+        }
+        s_init_entries[ins] = *prev;
+        ins--;
+    }
+
+    s_init_entries[ins].name = name ? name : "unnamed_init";
+    s_init_entries[ins].init_fn = fn;
+    s_init_entries[ins].level = level;
+    s_init_entries[ins].priority = priority;
     s_init_count++;
 
     return FW_OK;
@@ -35,20 +46,7 @@ fw_status_t fw_init_level(fw_init_level_t level) {
         return FW_ERR_INVALID_ARG;
     }
 
-    /* Bubble sort registered entries in this level by priority */
-    for (fw_size_t i = 0; i < s_init_count; i++) {
-        for (fw_size_t j = i + 1; j < s_init_count; j++) {
-            if (s_init_entries[i].level == (uint8_t)level && s_init_entries[j].level == (uint8_t)level) {
-                if (s_init_entries[i].priority > s_init_entries[j].priority) {
-                    fw_init_entry_t tmp = s_init_entries[i];
-                    s_init_entries[i] = s_init_entries[j];
-                    s_init_entries[j] = tmp;
-                }
-            }
-        }
-    }
-
-    /* Execute all entries belonging to this level */
+    /* Execute all entries belonging to this level (already sorted at registration) */
     for (fw_size_t i = 0; i < s_init_count; i++) {
         if (s_init_entries[i].level == (uint8_t)level && s_init_entries[i].init_fn != FW_NULL) {
             fw_status_t status = s_init_entries[i].init_fn();

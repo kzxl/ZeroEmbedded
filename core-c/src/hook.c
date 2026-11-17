@@ -9,6 +9,14 @@ fw_status_t fw_hook_table_init(fw_hook_table_t *table) {
     return FW_OK;
 }
 
+static void hook_remove_at(fw_hook_table_t *table, fw_size_t idx) {
+    for (fw_size_t j = idx; j + 1U < table->count; ++j) {
+        table->entries[j] = table->entries[j + 1U];
+    }
+    table->count--;
+    memset(&table->entries[table->count], 0, sizeof(fw_hook_entry_t));
+}
+
 fw_status_t fw_hook_register(
     fw_hook_table_t *table,
     uint32_t         event_id,
@@ -20,26 +28,31 @@ fw_status_t fw_hook_register(
         return FW_ERR_INVALID_ARG;
     }
 
-    /* Check if already registered or find first inactive slot */
-    int free_slot = -1;
-    for (fw_size_t i = 0; i < FW_HOOK_MAX_ENTRIES; i++) {
-        if (table->entries[i].active) {
-            if (table->entries[i].event_id == event_id && table->entries[i].callback == callback) {
-                /* Update priority and cookie */
-                table->entries[i].priority = priority;
+    for (fw_size_t i = 0; i < table->count; i++) {
+        if (table->entries[i].active &&
+            table->entries[i].event_id == event_id &&
+            table->entries[i].callback == callback) {
+            if (table->entries[i].priority == priority) {
                 table->entries[i].cookie = cookie;
                 return FW_OK;
             }
-        } else if (free_slot == -1) {
-            free_slot = (int)i;
+            hook_remove_at(table, i);
+            break;
         }
     }
 
-    if (free_slot == -1) {
+    if (table->count >= FW_HOOK_MAX_ENTRIES) {
         return FW_ERR_BUFFER_OVERFLOW;
     }
 
-    fw_hook_entry_t *e = &table->entries[free_slot];
+    /* Insert sorted by priority ascending (0 = highest priority) */
+    fw_size_t ins = table->count;
+    while (ins > 0U && table->entries[ins - 1U].priority > priority) {
+        table->entries[ins] = table->entries[ins - 1U];
+        ins--;
+    }
+
+    fw_hook_entry_t *e = &table->entries[ins];
     e->event_id = event_id;
     e->callback = callback;
     e->priority = priority;
@@ -59,14 +72,11 @@ fw_status_t fw_hook_unregister(
         return FW_ERR_INVALID_ARG;
     }
 
-    for (fw_size_t i = 0; i < FW_HOOK_MAX_ENTRIES; i++) {
+    for (fw_size_t i = 0; i < table->count; i++) {
         if (table->entries[i].active &&
             table->entries[i].event_id == event_id &&
             table->entries[i].callback == callback) {
-            table->entries[i].active = FW_FALSE;
-            if (table->count > 0) {
-                table->count--;
-            }
+            hook_remove_at(table, i);
             return FW_OK;
         }
     }
@@ -85,37 +95,11 @@ fw_hook_action_t fw_hook_dispatch(
 
     table->total_dispatches++;
 
-    /* Collect matching active entries */
-    fw_hook_entry_t *matched[FW_HOOK_MAX_ENTRIES];
-    fw_size_t match_count = 0;
-
-    for (fw_size_t i = 0; i < FW_HOOK_MAX_ENTRIES; i++) {
-        if (table->entries[i].active && table->entries[i].event_id == event_id) {
-            matched[match_count++] = &table->entries[i];
-        }
-    }
-
-    if (match_count == 0) {
-        return FW_HOOK_CONTINUE;
-    }
-
-    /* Sort by priority ascending (0 = highest priority) */
-    for (fw_size_t i = 0; i < match_count; i++) {
-        for (fw_size_t j = i + 1; j < match_count; j++) {
-            if (matched[i]->priority > matched[j]->priority) {
-                fw_hook_entry_t *tmp = matched[i];
-                matched[i] = matched[j];
-                matched[j] = tmp;
-            }
-        }
-    }
-
-    /* Execute in priority order */
-    for (fw_size_t i = 0; i < match_count; i++) {
-        fw_hook_entry_t *e = matched[i];
-        if (e->callback != FW_NULL) {
-            fw_hook_action_t action = e->callback(event_id, event_data, e->cookie);
-            if (action == FW_HOOK_STOP) {
+    /* Table is kept sorted by priority at registration; zero stack overhead here */
+    for (fw_size_t i = 0; i < table->count; i++) {
+        fw_hook_entry_t *e = &table->entries[i];
+        if (e->active && e->event_id == event_id && e->callback != FW_NULL) {
+            if (e->callback(event_id, event_data, e->cookie) == FW_HOOK_STOP) {
                 table->total_intercepts++;
                 return FW_HOOK_STOP;
             }
@@ -131,7 +115,7 @@ fw_size_t fw_hook_count(const fw_hook_table_t *table, uint32_t event_id) {
     }
 
     fw_size_t c = 0;
-    for (fw_size_t i = 0; i < FW_HOOK_MAX_ENTRIES; i++) {
+    for (fw_size_t i = 0; i < table->count; i++) {
         if (table->entries[i].active && table->entries[i].event_id == event_id) {
             c++;
         }

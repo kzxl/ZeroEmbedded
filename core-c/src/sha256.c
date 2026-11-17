@@ -25,23 +25,31 @@ static const uint32_t K[64] = {
     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 };
 
-static void sha256_transform(uint32_t state[8], const uint8_t data[64]) {
-    uint32_t W[64];
-    for (int i = 0; i < 16; ++i) {
-        W[i] = ((uint32_t)data[i * 4] << 24) |
-               ((uint32_t)data[i * 4 + 1] << 16) |
-               ((uint32_t)data[i * 4 + 2] << 8) |
-               ((uint32_t)data[i * 4 + 3]);
+static void secure_zero(void *ptr, fw_size_t len) {
+    volatile uint8_t *p = (volatile uint8_t*)ptr;
+    while (len--) {
+        *p++ = 0;
     }
-    for (int i = 16; i < 64; ++i) {
-        W[i] = sigma1(W[i - 2]) + W[i - 7] + sigma0(W[i - 15]) + W[i - 16];
-    }
+}
 
+static void sha256_transform(uint32_t state[8], const uint8_t data[64]) {
+    uint32_t W[16];
     uint32_t a = state[0], b = state[1], c = state[2], d = state[3];
     uint32_t e = state[4], f = state[5], g = state[6], h = state[7];
 
     for (int i = 0; i < 64; ++i) {
-        uint32_t T1 = h + SIGMA1(e) + CH(e, f, g) + K[i] + W[i];
+        uint32_t w;
+        if (i < 16) {
+            w = ((uint32_t)data[i * 4] << 24) |
+                ((uint32_t)data[i * 4 + 1] << 16) |
+                ((uint32_t)data[i * 4 + 2] << 8) |
+                ((uint32_t)data[i * 4 + 3]);
+            W[i] = w;
+        } else {
+            w = sigma1(W[(i - 2) & 15]) + W[(i - 7) & 15] + sigma0(W[(i - 15) & 15]) + W[i & 15];
+            W[i & 15] = w;
+        }
+        uint32_t T1 = h + SIGMA1(e) + CH(e, f, g) + K[i] + w;
         uint32_t T2 = SIGMA0(a) + MAJ(a, b, c);
         h = g;
         g = f;
@@ -55,6 +63,7 @@ static void sha256_transform(uint32_t state[8], const uint8_t data[64]) {
 
     state[0] += a; state[1] += b; state[2] += c; state[3] += d;
     state[4] += e; state[5] += f; state[6] += g; state[7] += h;
+    secure_zero(W, sizeof(W));
 }
 
 void fw_sha256_init(fw_sha256_ctx_t *ctx) {
@@ -74,8 +83,8 @@ void fw_sha256_update(fw_sha256_ctx_t *ctx, const void *data, fw_size_t len) {
     if (ctx == FW_NULL || data == FW_NULL || len == 0) return;
 
     const uint8_t *p = (const uint8_t*)data;
-    uint32_t buffer_idx = (uint32_t)((ctx->bit_count / 8) % FW_SHA256_BLOCK_SIZE);
-    ctx->bit_count += (uint64_t)len * 8;
+    uint32_t buffer_idx = (uint32_t)((ctx->bit_count >> 3) & (FW_SHA256_BLOCK_SIZE - 1U));
+    ctx->bit_count += (uint64_t)len << 3;
 
     while (len > 0) {
         uint32_t to_copy = FW_SHA256_BLOCK_SIZE - buffer_idx;
@@ -96,7 +105,7 @@ void fw_sha256_update(fw_sha256_ctx_t *ctx, const void *data, fw_size_t len) {
 void fw_sha256_final(fw_sha256_ctx_t *ctx, uint8_t digest[FW_SHA256_DIGEST_SIZE]) {
     if (ctx == FW_NULL || digest == FW_NULL) return;
 
-    uint32_t buffer_idx = (uint32_t)((ctx->bit_count / 8) % FW_SHA256_BLOCK_SIZE);
+    uint32_t buffer_idx = (uint32_t)((ctx->bit_count >> 3) & (FW_SHA256_BLOCK_SIZE - 1U));
 
     /* Pad 0x80 */
     ctx->buffer[buffer_idx++] = 0x80;
@@ -122,6 +131,8 @@ void fw_sha256_final(fw_sha256_ctx_t *ctx, uint8_t digest[FW_SHA256_DIGEST_SIZE]
         digest[i * 4 + 2] = (uint8_t)(ctx->state[i] >> 8);
         digest[i * 4 + 3] = (uint8_t)(ctx->state[i]);
     }
+
+    secure_zero(ctx, sizeof(*ctx));
 }
 
 void fw_sha256_digest(const void *data, fw_size_t len, uint8_t digest[FW_SHA256_DIGEST_SIZE]) {

@@ -36,6 +36,7 @@ fw_status_t fw_tasklet_post(
 
     fw_size_t head = q->head;
     fw_size_t tail = q->tail;
+    FW_ACQUIRE_BARRIER();
 
     if ((head - tail) >= q->capacity) {
         return FW_ERR_BUFFER_OVERFLOW;
@@ -46,7 +47,7 @@ fw_status_t fw_tasklet_post(
     q->storage[idx].context = context;
     q->storage[idx].arg = arg;
 
-    FW_MEMORY_BARRIER();
+    FW_RELEASE_BARRIER();
     q->head = head + 1;
 
     return FW_OK;
@@ -58,8 +59,8 @@ fw_bool_t fw_tasklet_dispatch_one(fw_tasklet_queue_t *q) {
     }
 
     fw_size_t tail = q->tail;
-    FW_MEMORY_BARRIER();
     fw_size_t head = q->head;
+    FW_ACQUIRE_BARRIER();
 
     if (tail == head) {
         return FW_FALSE; /* Queue empty */
@@ -70,7 +71,7 @@ fw_bool_t fw_tasklet_dispatch_one(fw_tasklet_queue_t *q) {
     void *context = q->storage[idx].context;
     uint32_t arg = q->storage[idx].arg;
 
-    FW_MEMORY_BARRIER();
+    FW_RELEASE_BARRIER();
     q->tail = tail + 1;
 
     if (handler != FW_NULL) {

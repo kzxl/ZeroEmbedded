@@ -118,6 +118,18 @@ static fw_status_t test_memory_hub(void) {
     TEST_ASSERT(fw_mem_hub_free(&hub, p3) == FW_OK, "Free p3 via hub");
     TEST_ASSERT(fw_mem_hub_free(&hub, p4) == FW_OK, "Free p4 via hub");
 
+    /* Verify DMA-hint allocation enforces cache-line (32B) alignment even from unaligned arena offset */
+    FW_ALIGNED(FW_CACHE_LINE_SIZE) static uint8_t dma_mem[256];
+    fw_arena_t dma_arena;
+    TEST_ASSERT(fw_arena_init(&dma_arena, dma_mem, sizeof(dma_mem)) == FW_OK, "DMA arena init");
+    void *unaligned_pad = fw_arena_alloc(&dma_arena, 3, 1);
+    TEST_ASSERT(unaligned_pad != FW_NULL, "Pad 3 bytes to misalign offset");
+    TEST_ASSERT(fw_mem_hub_register_arena(&hub, FW_MEM_TIER_DMA, &dma_arena, "dma_sram", 0) == FW_OK, "Register DMA arena");
+
+    void *dma_ptr = fw_mem_hub_alloc(&hub, 64, FW_MEM_HINT_DMA);
+    TEST_ASSERT(dma_ptr != FW_NULL, "DMA hub alloc must succeed");
+    TEST_ASSERT((((uintptr_t)dma_ptr) & (FW_CACHE_LINE_SIZE - 1U)) == 0U, "DMA alloc must be cache-line aligned");
+
     return FW_OK;
 }
 

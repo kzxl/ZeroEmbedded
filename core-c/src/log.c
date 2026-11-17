@@ -39,13 +39,20 @@ void fw_log_post_fast(uint8_t level, const char *tag, const char *fmt, uintptr_t
         return;
     }
 
-    fw_size_t next_head = (s_head + 1) % s_capacity;
-    if (next_head == s_tail) {
+    fw_size_t head = s_head;
+    fw_size_t tail = s_tail;
+    FW_ACQUIRE_BARRIER();
+
+    fw_size_t next_head = head + 1U;
+    if (next_head >= s_capacity) {
+        next_head = 0U;
+    }
+    if (next_head == tail) {
         /* Queue full -> drop entry without blocking */
         return;
     }
 
-    fw_log_entry_t *entry = &s_entries[s_head];
+    fw_log_entry_t *entry = &s_entries[head];
     entry->timestamp_ms = fw_timer_get_millis();
     entry->level        = level;
     entry->tag          = (tag != FW_NULL) ? tag : "SYS";
@@ -53,7 +60,7 @@ void fw_log_post_fast(uint8_t level, const char *tag, const char *fmt, uintptr_t
     entry->arg1         = arg1;
     entry->arg2         = arg2;
 
-    FW_MEMORY_BARRIER();
+    FW_RELEASE_BARRIER();
     s_head = next_head;
 }
 
@@ -70,8 +77,10 @@ fw_size_t fw_log_flush(fw_size_t max_entries) {
         if (max_entries > 0 && flushed >= max_entries) {
             break;
         }
+        FW_ACQUIRE_BARRIER();
 
-        const fw_log_entry_t *entry = &s_entries[s_tail];
+        fw_size_t tail = s_tail;
+        const fw_log_entry_t *entry = &s_entries[tail];
 
         /* Format message payload with up to 2 numeric/pointer arguments */
         snprintf(msg_buf, sizeof(msg_buf), entry->fmt, entry->arg1, entry->arg2);
@@ -93,8 +102,12 @@ fw_size_t fw_log_flush(fw_size_t max_entries) {
             s_sink(line_buf, (fw_size_t)len);
         }
 
-        FW_MEMORY_BARRIER();
-        s_tail = (s_tail + 1) % s_capacity;
+        fw_size_t next_tail = tail + 1U;
+        if (next_tail >= s_capacity) {
+            next_tail = 0U;
+        }
+        FW_RELEASE_BARRIER();
+        s_tail = next_tail;
         flushed++;
     }
 

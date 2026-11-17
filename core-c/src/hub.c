@@ -1,4 +1,5 @@
 #include "zero/memory/hub.h"
+#include "zero/hal/cache.h"
 #include <string.h>
 
 fw_status_t fw_mem_hub_init(fw_mem_hub_t *hub) {
@@ -62,7 +63,7 @@ fw_status_t fw_mem_hub_register_arena(
     return FW_OK;
 }
 
-static void* try_alloc_from_backend(fw_mem_backend_t *b, fw_size_t size) {
+static void* try_alloc_from_backend(fw_mem_backend_t *b, fw_size_t size, uint32_t hints) {
     if (b->type == FW_BACKEND_POOL) {
         fw_pool_t *pool = b->handle.pool;
         if (size > pool->block_size) {
@@ -83,14 +84,26 @@ static void* try_alloc_from_backend(fw_mem_backend_t *b, fw_size_t size) {
         }
     } else if (b->type == FW_BACKEND_ARENA) {
         fw_arena_t *arena = b->handle.arena;
+        fw_size_t align = ((hints & FW_MEM_HINT_DMA) || b->tier == FW_MEM_TIER_DMA)
+                              ? (fw_size_t)FW_CACHE_LINE_SIZE
+                              : 4U;
+        uintptr_t curr_ptr = (uintptr_t)(arena->buffer + arena->offset);
+        uintptr_t aligned_ptr = (curr_ptr + (align - 1U)) & ~(uintptr_t)(align - 1U);
+        fw_size_t padding = (fw_size_t)(aligned_ptr - curr_ptr);
         fw_size_t free_bytes = (arena->capacity > arena->offset) ? (arena->capacity - arena->offset) : 0;
-        if (free_bytes <= b->reserve_bytes || size > free_bytes || (free_bytes - size) < b->reserve_bytes) {
+
+        if (free_bytes <= b->reserve_bytes || padding > free_bytes || size > (free_bytes - padding)) {
+            return FW_NULL;
+        }
+
+        fw_size_t total_need = padding + size;
+        if ((free_bytes - total_need) < b->reserve_bytes) {
             return FW_NULL; /* Safety margin breach */
         }
 
-        void *ptr = fw_arena_alloc(arena, size, 4);
+        void *ptr = fw_arena_alloc(arena, size, align);
         if (ptr != FW_NULL) {
-            b->allocated_bytes += size;
+            b->allocated_bytes += total_need;
             if (b->allocated_bytes > b->peak_used_bytes) {
                 b->peak_used_bytes = b->allocated_bytes;
             }
@@ -129,7 +142,7 @@ void* fw_mem_hub_alloc(fw_mem_hub_t *hub, fw_size_t size, uint32_t hints) {
         for (fw_size_t b_idx = 0; b_idx < hub->backend_count; b_idx++) {
             fw_mem_backend_t *b = &hub->backends[b_idx];
             if (b->tier == target_tier) {
-                void *ptr = try_alloc_from_backend(b, size);
+                void *ptr = try_alloc_from_backend(b, size, hints);
                 if (ptr != FW_NULL) {
                     return ptr;
                 }

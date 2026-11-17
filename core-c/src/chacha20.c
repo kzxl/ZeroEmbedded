@@ -4,7 +4,15 @@
  */
 
 #include "zero/crypto/chacha20.h"
+#include "zero/attributes.h"
 #include <string.h>
+
+static void secure_zero(void *ptr, fw_size_t len) {
+    volatile uint8_t *p = (volatile uint8_t*)ptr;
+    while (len--) {
+        *p++ = 0;
+    }
+}
 
 #define ROTL32(v, n) (((v) << (n)) | ((v) >> (32 - (n))))
 
@@ -79,6 +87,7 @@ static void chacha20_block(fw_chacha20_ctx_t *ctx, uint8_t output[64]) {
     }
 
     ctx->state[12]++;
+    secure_zero(x, sizeof(x));
 }
 
 void fw_chacha20_crypt(fw_chacha20_ctx_t *ctx,
@@ -87,18 +96,35 @@ void fw_chacha20_crypt(fw_chacha20_ctx_t *ctx,
                        fw_size_t length) {
     if (ctx == FW_NULL || in == FW_NULL || out == FW_NULL || length == 0) return;
 
-    uint8_t keystream[64];
+    FW_ALIGNED(4) uint8_t keystream[64];
 
     while (length > 0) {
         chacha20_block(ctx, keystream);
 
-        fw_size_t chunk = (length > 64) ? 64 : length;
-        for (fw_size_t i = 0; i < chunk; ++i) {
-            out[i] = in[i] ^ keystream[i];
+        fw_size_t chunk = (length > 64U) ? 64U : length;
+        if ((((uintptr_t)in | (uintptr_t)out) & 3U) == 0U && chunk >= 4U) {
+            fw_size_t words = chunk >> 2;
+            fw_size_t done = words << 2;
+            for (fw_size_t off = 0; off < done; off += 4U) {
+                uint32_t v_in, v_ks, v_out;
+                memcpy(&v_in, in + off, sizeof(uint32_t));
+                memcpy(&v_ks, keystream + off, sizeof(uint32_t));
+                v_out = v_in ^ v_ks;
+                memcpy(out + off, &v_out, sizeof(uint32_t));
+            }
+            for (fw_size_t i = done; i < chunk; ++i) {
+                out[i] = in[i] ^ keystream[i];
+            }
+        } else {
+            for (fw_size_t i = 0; i < chunk; ++i) {
+                out[i] = in[i] ^ keystream[i];
+            }
         }
 
         in     += chunk;
         out    += chunk;
         length -= chunk;
     }
+
+    secure_zero(keystream, sizeof(keystream));
 }

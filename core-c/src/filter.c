@@ -15,17 +15,13 @@
     } while (0)
 
 uint16_t fw_filter_median5_u16(uint16_t s0, uint16_t s1, uint16_t s2, uint16_t s3, uint16_t s4) {
+    /* 4 swaps place min(s0..s3) in s0 and max(s0..s3) in s3, leaving {s1, s2, s4} containing the median */
     SWAP_IF_GREATER(s0, s1);
     SWAP_IF_GREATER(s2, s3);
     SWAP_IF_GREATER(s0, s2);
     SWAP_IF_GREATER(s1, s3);
-    SWAP_IF_GREATER(s1, s2);
-    SWAP_IF_GREATER(s0, s4);
-    SWAP_IF_GREATER(s1, s4);
-    SWAP_IF_GREATER(s2, s4);
-    SWAP_IF_GREATER(s2, s3);
 
-    return s2;
+    return fw_filter_median3_u16(s1, s2, s4);
 }
 
 void fw_debounce_init(fw_debounce_t *db, uint16_t threshold, fw_bool_t initial_state) {
