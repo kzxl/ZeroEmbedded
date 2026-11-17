@@ -51,10 +51,27 @@ class Diagnostic:
     def __str__(self):
         return f"{self.file_path}:{self.line_no}:1: {self.severity}: [{self.code}] {self.message}"
 
+def strip_c_comments_and_strings(text: str) -> str:
+    """Replaces comments and string contents with spaces while preserving line numbers."""
+    def replacer(match: re.Match) -> str:
+        s = match.group(0)
+        if s.startswith('"'):
+            return '""'
+        if s.startswith("'"):
+            return "''"
+        return re.sub(r"[^\n]", " ", s)
+
+    pattern = re.compile(
+        r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|//[^\n]*|/\*[\s\S]*?\*/'
+    )
+    return pattern.sub(replacer, text)
+
 def analyze_c_file(file_path: str) -> list[Diagnostic]:
     diagnostics = []
     with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-        lines = f.readlines()
+        raw_text = f.read()
+
+    lines = strip_c_comments_and_strings(raw_text).splitlines()
 
     in_isr_function = False
     has_opened_brace = False
@@ -65,8 +82,6 @@ def analyze_c_file(file_path: str) -> list[Diagnostic]:
     call_regex = re.compile(r"\b([a-zA-Z_]\w*)\s*\(")
 
     for idx, line in enumerate(lines, start=1):
-        clean_line = line.strip()
-
         # Check for ISR function start
         isr_match = isr_decl_regex.search(line)
         if isr_match:
@@ -87,13 +102,12 @@ def analyze_c_file(file_path: str) -> list[Diagnostic]:
                 fn_name = match.group(1)
                 if fn_name in FORBIDDEN_ISR_CALLS:
                     msg = FORBIDDEN_ISR_CALLS[fn_name]
-                    code = msg.split(":")[0]
-                    detail = msg.split(":")[1].strip()
+                    code, detail = msg.split(":", 1)
                     diagnostics.append(Diagnostic(
                         file_path=file_path,
                         line_no=idx,
-                        code=code,
-                        message=f"{detail} (in ISR '{current_isr_name}')"
+                        code=code.strip(),
+                        message=f"{detail.strip()} (in ISR '{current_isr_name}')"
                     ))
 
             if has_opened_brace and brace_depth <= 0:

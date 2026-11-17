@@ -31,6 +31,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 file(GLOB_RECURSE ZERO_SOURCES "src/*.c")
 
 add_library(zero_core_c STATIC ${ZERO_SOURCES})
+add_library(Zero::core_c ALIAS zero_core_c)
 add_library(ZeroEmbedded::core_c ALIAS zero_core_c)
 
 target_include_directories(zero_core_c

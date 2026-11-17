@@ -1,4 +1,4 @@
-# ZeroEmbedded One-Step Build & Verification Script
+﻿# ZeroEmbedded One-Step Build & Verification Script
 
 $ErrorActionPreference = "Stop"
 
@@ -25,18 +25,22 @@ $buildDir = Join-Path $PSScriptRoot "..\build"
 
 Write-Host "[1/4] Configuring CMake project..." -ForegroundColor Yellow
 & $cmakeExe -B $buildDir -S (Join-Path $PSScriptRoot "..") -G "Visual Studio 17 2022" -A x64
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "`n[2/4] Compiling ZeroEmbedded (Release)..." -ForegroundColor Yellow
 & $cmakeExe --build $buildDir --config Release
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "`n[3/4] Running Hardened Test Suites via CTest..." -ForegroundColor Yellow
 $ctestExe = Join-Path (Split-Path $cmakeExe) "ctest.exe"
 & $ctestExe --test-dir $buildDir -C Release --output-on-failure
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "`n[4/4] Executing End-to-End Simulations..." -ForegroundColor Yellow
 $hostSimExe = Join-Path $buildDir "Release\example_host_sim.exe"
 if (Test-Path $hostSimExe) {
     & $hostSimExe
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 Write-Host "`n[PASS] All builds, unit tests, and simulations executed successfully!" -ForegroundColor Green

@@ -29,11 +29,15 @@
       <description>ZeroEmbedded Core C Library - Static allocation, FSM, Tasklet, Sync, and Memory</description>
       <files>
         <file category="include" name="core-c/include/"/>
+        <file category="source"  name="core-c/src/assert.c"/>
+        <file category="source"  name="core-c/src/init.c"/>
         <file category="source"  name="core-c/src/arena.c"/>
         <file category="source"  name="core-c/src/buffer.c"/>
         <file category="source"  name="core-c/src/pool.c"/>
+        <file category="source"  name="core-c/src/hub.c"/>
         <file category="source"  name="core-c/src/fsm.c"/>
         <file category="source"  name="core-c/src/spsc.c"/>
+        <file category="source"  name="core-c/src/hook.c"/>
         <file category="source"  name="core-c/src/tasklet.c"/>
         <file category="source"  name="core-c/src/dispatcher.c"/>
         <file category="source"  name="core-c/src/zerowire.c"/>
@@ -41,11 +45,11 @@
     </component>
 
     <component Cclass="Framework" Cgroup="ZeroEmbedded" Csub="Observability" Cversion="0.7.0">
-      <description>Deferred binary logger, DWT cycle counter, and crash dump telemetry</description>
+      <description>Deferred binary logger, boot loop guard, and crash dump telemetry</description>
       <files>
         <file category="include" name="core-c/include/"/>
         <file category="source"  name="core-c/src/log.c"/>
-        <file category="source"  name="core-c/src/dwt.c"/>
+        <file category="source"  name="core-c/src/boot_guard.c"/>
         <file category="source"  name="core-c/src/crash_dump.c"/>
       </files>
     </component>
@@ -77,11 +81,18 @@
     </component>
 
     <component Cclass="Framework" Cgroup="ZeroEmbedded" Csub="HAL-RTOS" Cversion="0.7.0">
-      <description>Power management state machine and OSAL abstraction</description>
+      <description>HAL drivers, power management, task monitor, and OSAL abstraction</description>
       <files>
         <file category="include" name="core-c/include/"/>
+        <file category="source"  name="core-c/src/gpio.c"/>
+        <file category="source"  name="core-c/src/uart.c"/>
+        <file category="source"  name="core-c/src/timer.c"/>
+        <file category="source"  name="core-c/src/watchdog.c"/>
+        <file category="source"  name="core-c/src/hal/cache.c"/>
+        <file category="source"  name="core-c/src/hal/dma.c"/>
         <file category="source"  name="core-c/src/power.c"/>
-        <file category="source"  name="core-c/src/rtos.c"/>
+        <file category="source"  name="core-c/src/rtos_baremetal.c"/>
+        <file category="source"  name="core-c/src/monitor.c"/>
       </files>
     </component>
   </components>

@@ -37,6 +37,7 @@ add_library(zero_core_c STATIC
 )
 
 add_library(Zero::core_c ALIAS zero_core_c)
+add_library(ZeroEmbedded::core_c ALIAS zero_core_c)
 
 target_include_directories(zero_core_c PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

@@ -59,9 +59,9 @@ void send_packet(void) {
 
 ## 3. Analyzer Diagnostic Codes
 
-- `ZE-001`: Allocation in ISR context
-- `ZE-002`: Blocking function invoked from ISR
-- `ZE-003`: Memory leak on owning pointer
-- `ZE-004`: Use-after-free detected
-- `ZE-005`: Stack buffer passed to asynchronous DMA
-- `ZE-006`: Null pointer passed to `FW_NONNULL` parameter
+- `ZE-001`: Dynamic memory allocation or deallocation in ISR context (`malloc`, `free`, etc.)
+- `ZE-002`: Blocking delay or sleep invoked from ISR context (`delay_ms`, `fw_delay_millis`, etc.)
+- `ZE-003`: Blocking synchronization or mutex acquire invoked from ISR context (`fw_mutex_lock`, `xSemaphoreTake`, etc.)
+- `ZE-004`: Non-reentrant or unbounded standard I/O invoked from ISR context (`printf`, `sprintf`, etc.)
+- `ZE-005`: Memory leak or use-after-free detected on `FW_OWNER` pointer
+- `ZE-006`: Stack buffer passed to asynchronous `FW_DMA` or null pointer passed to `FW_NONNULL` parameter
