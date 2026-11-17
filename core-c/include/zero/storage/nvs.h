@@ -10,6 +10,7 @@
 
 #include "zero/types.h"
 #include "zero/result.h"
+#include "zero/assert.h"
 #include "zero/span.h"
 #include "zero/storage/flash.h"
 
@@ -47,6 +48,9 @@ typedef struct {
     uint16_t crc16;      /*!< CRC16-CCITT of (key + length + payload) */
     uint16_t status;     /*!< FW_NVS_STATUS_VALID or FW_NVS_STATUS_DEAD */
 } fw_nvs_record_hdr_t;
+
+FW_STATIC_ASSERT(sizeof(fw_nvs_sector_hdr_t) == 16, "fw_nvs_sector_hdr_t must be 16 bytes");
+FW_STATIC_ASSERT(sizeof(fw_nvs_record_hdr_t) == 8, "fw_nvs_record_hdr_t must be 8 bytes");
 
 /**
  * @brief NVS Storage instance structure (~32 bytes in RAM/BSS).

@@ -19,9 +19,16 @@ void fw_cache_clean(const void *addr, fw_size_t size) {
     }
     /* Drain write buffer */
     __asm__ __volatile__("mcr p15, 0, %0, c7, c10, 4" :: "r"(0) : "memory");
-#elif defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7EM__) || defined(__ARM_ARCH_8M_MAIN__)
-    /* Cortex-M7 / main profile cache operations if available */
-    FW_COMPILER_BARRIER();
+#elif (defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7EM__) || defined(__ARM_ARCH_8M_MAIN__)) && !defined(_WIN32) && !defined(__linux__) && !defined(__APPLE__)
+    /* Cortex-M7 / ARMv8-M SCB->DCCMVAC (0xE000EF68) clean D-Cache line by MVA */
+    volatile uint32_t *dccmvac = (volatile uint32_t*)0xE000EF68U;
+    uintptr_t start = (uintptr_t)addr & ~(uintptr_t)(FW_CACHE_LINE_SIZE - 1U);
+    uintptr_t end = (uintptr_t)addr + size;
+    __asm__ __volatile__("dsb" ::: "memory");
+    for (uintptr_t line = start; line < end; line += FW_CACHE_LINE_SIZE) {
+        *dccmvac = (uint32_t)line;
+    }
+    __asm__ __volatile__("dsb\n\tisb" ::: "memory");
 #else
     /* Portable / Host fallback */
     FW_COMPILER_BARRIER();
@@ -45,6 +52,16 @@ void fw_cache_invalidate(void *addr, fw_size_t size) {
     for (uintptr_t line = start; line < end; line += FW_CACHE_LINE_SIZE) {
         __asm__ __volatile__("mcr p15, 0, %0, c7, c6, 1" :: "r"(line) : "memory");
     }
+#elif (defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7EM__) || defined(__ARM_ARCH_8M_MAIN__)) && !defined(_WIN32) && !defined(__linux__) && !defined(__APPLE__)
+    /* Cortex-M7 / ARMv8-M SCB->DCIMVAC (0xE000EF60) invalidate D-Cache line by MVA */
+    volatile uint32_t *dcimvac = (volatile uint32_t*)0xE000EF60U;
+    uintptr_t start = (uintptr_t)addr & ~(uintptr_t)(FW_CACHE_LINE_SIZE - 1U);
+    uintptr_t end = (uintptr_t)addr + size;
+    __asm__ __volatile__("dsb" ::: "memory");
+    for (uintptr_t line = start; line < end; line += FW_CACHE_LINE_SIZE) {
+        *dcimvac = (uint32_t)line;
+    }
+    __asm__ __volatile__("dsb\n\tisb" ::: "memory");
 #else
     FW_COMPILER_BARRIER();
 #endif

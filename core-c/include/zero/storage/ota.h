@@ -11,6 +11,7 @@
 
 #include "zero/types.h"
 #include "zero/result.h"
+#include "zero/assert.h"
 #include "zero/storage/flash.h"
 
 #ifdef __cplusplus
@@ -42,6 +43,8 @@ typedef struct {
     uint32_t max_attempts;  /*!< Maximum allowed boots before forced rollback */
     uint32_t reserved[7];   /*!< 64-byte alignment padding */
 } fw_app_desc_t;
+
+FW_STATIC_ASSERT(sizeof(fw_app_desc_t) == 64, "fw_app_desc_t must be 64 bytes");
 
 /**
  * @brief OTA manager instance structure.

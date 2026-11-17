@@ -75,6 +75,36 @@
     #define FW_LIKELY(x) (x)
     #define FW_UNLIKELY(x) (x)
     #define FW_UNREACHABLE() do {} while(0)
+    #define FW_COMPILER_BARRIER() do {} while(0)
+    #define FW_MEMORY_BARRIER()   do {} while(0)
+#endif
+
+/* ========================================================================== */
+/* Portable Interrupt Critical Section Primitives                             */
+/* ========================================================================== */
+
+#if (defined(__clang__) || defined(__GNUC__)) && (defined(__arm__) || defined(__thumb__)) && !defined(_WIN32) && !defined(__linux__) && !defined(__APPLE__)
+    #define FW_CRITICAL_ENTER() uint32_t _fw_primask; __asm__ __volatile__("mrs %0, primask\n\tcpsid i" : "=r"(_fw_primask) :: "memory")
+    #define FW_CRITICAL_EXIT()  __asm__ __volatile__("msr primask, %0" :: "r"(_fw_primask) : "memory")
+#elif (defined(__clang__) || defined(__GNUC__)) && defined(__riscv) && !defined(__linux__)
+    #define FW_CRITICAL_ENTER() uintptr_t _fw_mstatus; __asm__ __volatile__("csrrci %0, mstatus, 8" : "=r"(_fw_mstatus) :: "memory")
+    #define FW_CRITICAL_EXIT()  __asm__ __volatile__("csrw mstatus, %0" :: "r"(_fw_mstatus) : "memory")
+#else
+    #define FW_CRITICAL_ENTER() FW_COMPILER_BARRIER()
+    #define FW_CRITICAL_EXIT()  FW_COMPILER_BARRIER()
+#endif
+
+/* ========================================================================== */
+/* Acquire / Release Memory Ordering Barriers                                 */
+/* ========================================================================== */
+
+#if defined(_M_X64) || defined(_M_IX86) || defined(__x86_64__) || defined(__i386__)
+    /* x86/x64 hardware enforces Total Store Order (TSO): load-acquire and store-release only need compiler barrier */
+    #define FW_ACQUIRE_BARRIER() FW_COMPILER_BARRIER()
+    #define FW_RELEASE_BARRIER() FW_COMPILER_BARRIER()
+#else
+    #define FW_ACQUIRE_BARRIER() FW_MEMORY_BARRIER()
+    #define FW_RELEASE_BARRIER() FW_MEMORY_BARRIER()
 #endif
 
 /* ========================================================================== */

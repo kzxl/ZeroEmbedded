@@ -6,8 +6,8 @@
  * @brief Ultra-low power management, WFI sleep scheduling, and CPU load metrics.
  */
 
-#include "../types.h"
-#include "../attributes.h"
+#include "zero/types.h"
+#include "zero/attributes.h"
 
 #ifdef __cplusplus
 extern "C" {

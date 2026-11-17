@@ -8,6 +8,7 @@
  */
 
 #include "zero/types.h"
+#include "zero/attributes.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,7 +27,10 @@ extern "C" {
  * @param alpha_shift Power-of-two filter coefficient (e.g. 1=50%, 2=25%, 3=12.5%, 4=6.25%).
  * @return Filtered output Y[n].
  */
-static inline uint16_t fw_filter_ema_u16(uint16_t current_ema, uint16_t new_sample, uint8_t alpha_shift) {
+FW_INLINE uint16_t fw_filter_ema_u16(uint16_t current_ema, uint16_t new_sample, uint8_t alpha_shift) {
+    if (alpha_shift > 15U) {
+        alpha_shift = 15U;
+    }
     int32_t diff = (int32_t)new_sample - (int32_t)current_ema;
     return (uint16_t)((int32_t)current_ema + (diff >> alpha_shift));
 }
@@ -34,7 +38,10 @@ static inline uint16_t fw_filter_ema_u16(uint16_t current_ema, uint16_t new_samp
 /**
  * @brief Computes 32-bit signed EMA using bit-shift division.
  */
-static inline int32_t fw_filter_ema_i32(int32_t current_ema, int32_t new_sample, uint8_t alpha_shift) {
+FW_INLINE int32_t fw_filter_ema_i32(int32_t current_ema, int32_t new_sample, uint8_t alpha_shift) {
+    if (alpha_shift > 30U) {
+        alpha_shift = 30U;
+    }
     int64_t diff = (int64_t)new_sample - (int64_t)current_ema;
     return (int32_t)((int64_t)current_ema + (diff >> alpha_shift));
 }
@@ -46,7 +53,7 @@ static inline int32_t fw_filter_ema_i32(int32_t current_ema, int32_t new_sample,
 /**
  * @brief Computes median of 3 samples (removes isolated ADC noise spikes).
  */
-static inline uint16_t fw_filter_median3_u16(uint16_t a, uint16_t b, uint16_t c) {
+FW_INLINE uint16_t fw_filter_median3_u16(uint16_t a, uint16_t b, uint16_t c) {
     if ((a <= b) && (b <= c)) return b;
     if ((a <= c) && (c <= b)) return c;
     if ((b <= a) && (a <= c)) return a;
@@ -91,7 +98,7 @@ fw_bool_t fw_debounce_update(fw_debounce_t *db, fw_bool_t raw_sample);
 /**
  * @brief Returns current stable debounced state.
  */
-static inline fw_bool_t fw_debounce_is_active(const fw_debounce_t *db) {
+FW_INLINE fw_bool_t fw_debounce_is_active(const fw_debounce_t *db) {
     return (db != FW_NULL) ? db->debounced_state : FW_FALSE;
 }
 

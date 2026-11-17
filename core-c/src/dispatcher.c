@@ -45,8 +45,10 @@ fw_status_t fw_cmd_dispatch(
             }
 
             fw_cspan_t req_span = fw_cspan_make(req->payload, req->length);
-            uint8_t resp_payload[ZEROWIRE_MAX_PAYLOAD];
-            fw_span_t resp_span = FW_SPAN_FROM_ARRAY(resp_payload);
+            uint8_t fallback_payload[1];
+            fw_span_t resp_span = (out_resp != FW_NULL)
+                ? fw_span_make(out_resp->payload, ZEROWIRE_MAX_PAYLOAD)
+                : fw_span_make(fallback_payload, 0);
             fw_size_t resp_len = 0;
 
             fw_status_t st = entry->handler(req->seq, req_span, resp_span, &resp_len);
@@ -54,12 +56,15 @@ fw_status_t fw_cmd_dispatch(
                 return st;
             }
 
+            if (resp_len > ZEROWIRE_MAX_PAYLOAD) {
+                return FW_ERR_BUFFER_OVERFLOW;
+            }
+
             /* Build response frame if payload produced and destination provided */
             if (resp_len > 0 && out_resp != FW_NULL) {
                 out_resp->seq = req->seq;
-                out_resp->msg_id = req->msg_id | 0x80; /* Response flag high-bit convention */
+                out_resp->msg_id = (uint8_t)(req->msg_id | 0x80U); /* Response flag high-bit convention */
                 out_resp->length = (uint16_t)resp_len;
-                memcpy(out_resp->payload, resp_payload, resp_len);
 
                 if (out_has_response != FW_NULL) {
                     *out_has_response = FW_TRUE;

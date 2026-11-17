@@ -9,11 +9,11 @@
  * raw pointer + size arithmetic errors. Backing storage is strictly non-heap.
  */
 
-#include "../types.h"
-#include "../result.h"
-#include "../span.h"
-#include "../string_view.h"
-#include "../attributes.h"
+#include "zero/types.h"
+#include "zero/result.h"
+#include "zero/span.h"
+#include "zero/string_view.h"
+#include "zero/attributes.h"
 
 #ifdef __cplusplus
 extern "C" {

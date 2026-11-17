@@ -99,17 +99,26 @@ fw_status_t fw_pool_init(
 }
 
 void* fw_pool_alloc(fw_pool_t *pool) {
-    if (pool == FW_NULL || pool->free_list == FW_NULL) {
+    if (pool == FW_NULL) {
         return FW_NULL;
     }
 
+    FW_CRITICAL_ENTER();
+
     fw_pool_node_t *node = pool->free_list;
+    if (node == FW_NULL) {
+        FW_CRITICAL_EXIT();
+        return FW_NULL;
+    }
+
     pool->free_list = node->next;
     pool->free_count--;
 
     fw_size_t offset = (fw_size_t)((uintptr_t)node - (uintptr_t)pool->storage);
     fw_size_t idx = (pool->block_shift > 0) ? (offset >> pool->block_shift) : (offset / pool->block_size);
     pool->alloc_bitmap[idx >> 5] |= (1U << (idx & 31));
+
+    FW_CRITICAL_EXIT();
 
     return (void*)node;
 }
@@ -145,8 +154,11 @@ fw_status_t fw_pool_free(fw_pool_t *pool, void *block) {
     uint32_t mask = 1U << (idx & 31);
     fw_size_t word_idx = idx >> 5;
 
+    FW_CRITICAL_ENTER();
+
     /* Double-Free Check: block must be currently marked as allocated */
     if ((pool->alloc_bitmap[word_idx] & mask) == 0) {
+        FW_CRITICAL_EXIT();
         return FW_ERR_INVALID_ARG; /* REJECT DOUBLE FREE */
     }
 
@@ -163,6 +175,8 @@ fw_status_t fw_pool_free(fw_pool_t *pool, void *block) {
     node->next = pool->free_list;
     pool->free_list = node;
     pool->free_count++;
+
+    FW_CRITICAL_EXIT();
 
     return FW_OK;
 }

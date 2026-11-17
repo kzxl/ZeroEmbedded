@@ -9,10 +9,10 @@
  * and the main thread loop without mutexes or critical section locks.
  */
 
-#include "../types.h"
-#include "../result.h"
-#include "../span.h"
-#include "../attributes.h"
+#include "zero/types.h"
+#include "zero/result.h"
+#include "zero/span.h"
+#include "zero/attributes.h"
 
 #ifdef __cplusplus
 extern "C" {

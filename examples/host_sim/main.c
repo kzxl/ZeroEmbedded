@@ -23,10 +23,6 @@ static fw_tasklet_queue_t s_tasklet_q;
 
 static const fw_gpio_t STATUS_LED = FW_GPIO_PIN(FW_GPIO_PORT_C, FW_GPIO_PIN_13);
 
-/* External mock injection helpers */
-extern void fw_uart_mock_inject_rx(fw_uart_t *uart, uint8_t byte);
-extern fw_bool_t fw_uart_mock_extract_tx(fw_uart_t *uart, uint8_t *out_byte);
-
 static void on_packet_processed(void *context, uint32_t arg) {
     (void)context;
     printf("[HOST_SIM:TASKLET] Processing packet ID 0x%02X in background...\n", arg);

@@ -77,7 +77,7 @@ fw_status_t fw_fsm_init(fw_fsm_t *fsm,
  * @param event Event ID to process.
  * @return FW_OK if a transition was taken;
  *         FW_ERR_NOT_FOUND if no transition matched (ignored event);
- *         FW_ERR_INVALID_PARAM if fsm is NULL.
+ *         FW_ERR_INVALID_ARG if fsm is NULL.
  */
 fw_status_t fw_fsm_dispatch(fw_fsm_t *fsm, fw_fsm_event_t event);
 

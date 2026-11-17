@@ -4,24 +4,17 @@
  */
 
 #include "zero/storage/nvs.h"
+#include "zero/protocol/zerowire.h"
 #include <string.h>
 
 #define ALIGN_UP_4(x) (((uint32_t)(x) + 3U) & ~3U)
+#define NVS_COMPACT_CACHE_CAP 32U
 
-/* Fast, self-contained CRC16-CCITT (poly 0x1021, init 0xFFFF) */
-static uint16_t crc16_step(uint16_t crc, const uint8_t *data, fw_size_t len) {
-    while (len--) {
-        crc ^= (uint16_t)(*data++) << 8;
-        for (int i = 0; i < 8; ++i) {
-            if (crc & 0x8000) {
-                crc = (crc << 1) ^ 0x1021;
-            } else {
-                crc <<= 1;
-            }
-        }
-    }
-    return crc;
-}
+typedef struct {
+    uint32_t latest_offset;
+    uint16_t key;
+    uint16_t latest_status;
+} nvs_compact_entry_t;
 
 static uint16_t calc_record_crc(uint16_t key, uint16_t length, const void *payload) {
     uint8_t meta[4];
@@ -30,9 +23,9 @@ static uint16_t calc_record_crc(uint16_t key, uint16_t length, const void *paylo
     meta[2] = (uint8_t)(length & 0xFF);
     meta[3] = (uint8_t)((length >> 8) & 0xFF);
 
-    uint16_t crc = crc16_step(0xFFFF, meta, 4);
+    uint16_t crc = fw_crc16_ccitt_update(0xFFFFU, meta, sizeof(meta));
     if (length > 0 && payload != FW_NULL) {
-        crc = crc16_step(crc, (const uint8_t*)payload, length);
+        crc = fw_crc16_ccitt_update(crc, payload, length);
     }
     return crc;
 }
@@ -155,6 +148,59 @@ fw_status_t fw_nvs_init(fw_nvs_t *nvs,
     return FW_OK;
 }
 
+static int nvs_cache_find(const nvs_compact_entry_t *cache, fw_size_t count, uint16_t key) {
+    for (fw_size_t i = 0; i < count; ++i) {
+        if (cache[i].key == key) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
+static fw_status_t nvs_copy_record(
+    fw_nvs_t *nvs,
+    uint32_t src_addr,
+    uint32_t dst_addr,
+    uint32_t total_bytes
+) {
+    uint8_t copy_buf[128];
+    uint32_t remaining = total_bytes;
+
+    while (remaining > 0U) {
+        uint32_t chunk = (remaining > (uint32_t)sizeof(copy_buf)) ? (uint32_t)sizeof(copy_buf) : remaining;
+        FW_CHECK(flash_read(nvs, src_addr, copy_buf, chunk));
+        FW_CHECK(flash_write(nvs, dst_addr, copy_buf, chunk));
+        src_addr += chunk;
+        dst_addr += chunk;
+        remaining -= chunk;
+    }
+
+    return FW_OK;
+}
+
+static fw_bool_t nvs_is_key_latest_after(
+    const fw_nvs_t *nvs,
+    uint32_t base,
+    uint32_t start_offset,
+    uint16_t key
+) {
+    uint32_t scan_off = start_offset;
+    while (scan_off < nvs->write_offset) {
+        fw_nvs_record_hdr_t next_hdr;
+        if (flash_read(nvs, base + scan_off, &next_hdr, sizeof(next_hdr)) != FW_OK) {
+            break;
+        }
+        if (next_hdr.key == FW_NVS_KEY_EMPTY) {
+            break;
+        }
+        if (next_hdr.key == key) {
+            return FW_FALSE;
+        }
+        scan_off += sizeof(fw_nvs_record_hdr_t) + ALIGN_UP_4(next_hdr.length);
+    }
+    return FW_TRUE;
+}
+
 /* Performs Garbage Collection compaction: copies latest unique keys from active bank to alt bank */
 static fw_status_t nvs_compact(fw_nvs_t *nvs) {
     uint8_t alt_bank = (uint8_t)(1 - nvs->active_bank);
@@ -176,71 +222,94 @@ static fw_status_t nvs_compact(fw_nvs_t *nvs) {
 
     uint32_t dst_offset = sizeof(fw_nvs_sector_hdr_t);
 
-    /* 3. Scan active bank and migrate only latest valid unique records */
+    /* 3. Pass 1 (O(N)): Index latest offset/status of up to 32 distinct keys */
+    nvs_compact_entry_t cache[NVS_COMPACT_CACHE_CAP];
+    fw_size_t unique_count = 0;
+    fw_bool_t has_overflow = FW_FALSE;
+
     uint32_t src_offset = sizeof(fw_nvs_sector_hdr_t);
     while (src_offset < nvs->write_offset) {
         fw_nvs_record_hdr_t cur_hdr;
         if (flash_read(nvs, src_base + src_offset, &cur_hdr, sizeof(cur_hdr)) != FW_OK) {
             break;
         }
-
         if (cur_hdr.key == FW_NVS_KEY_EMPTY) {
             break;
         }
 
         uint32_t cur_total = sizeof(fw_nvs_record_hdr_t) + ALIGN_UP_4(cur_hdr.length);
+        if (src_offset + cur_total > nvs->write_offset) {
+            break;
+        }
 
-        if (cur_hdr.status == FW_NVS_STATUS_VALID) {
-            /* Check if this key was superseded by a later record in the log */
-            fw_bool_t is_latest = FW_TRUE;
-            uint32_t scan_off = src_offset + cur_total;
-
-            while (scan_off < nvs->write_offset) {
-                fw_nvs_record_hdr_t next_hdr;
-                if (flash_read(nvs, src_base + scan_off, &next_hdr, sizeof(next_hdr)) != FW_OK) {
-                    break;
-                }
-                if (next_hdr.key == FW_NVS_KEY_EMPTY) {
-                    break;
-                }
-                if (next_hdr.key == cur_hdr.key) {
-                    is_latest = FW_FALSE;
-                    break;
-                }
-                scan_off += sizeof(fw_nvs_record_hdr_t) + ALIGN_UP_4(next_hdr.length);
-            }
-
-            if (is_latest) {
-                /* Copy this live record to destination bank */
-                if (dst_offset + cur_total > max_size) {
-                    return FW_ERR_OUT_OF_MEMORY;
-                }
-
-                uint8_t copy_buf[128];
-                uint32_t bytes_to_copy = cur_total;
-                uint32_t chunk_src = src_base + src_offset;
-                uint32_t chunk_dst = dst_base + dst_offset;
-
-                while (bytes_to_copy > 0) {
-                    uint32_t chunk = (bytes_to_copy > sizeof(copy_buf)) ? sizeof(copy_buf) : bytes_to_copy;
-                    FW_CHECK(flash_read(nvs, chunk_src, copy_buf, chunk));
-                    FW_CHECK(flash_write(nvs, chunk_dst, copy_buf, chunk));
-                    chunk_src += chunk;
-                    chunk_dst += chunk;
-                    bytes_to_copy -= chunk;
-                }
-
-                dst_offset += cur_total;
-            }
+        int slot = nvs_cache_find(cache, unique_count, cur_hdr.key);
+        if (slot >= 0) {
+            cache[slot].latest_offset = src_offset;
+            cache[slot].latest_status = cur_hdr.status;
+        } else if (unique_count < NVS_COMPACT_CACHE_CAP) {
+            cache[unique_count].latest_offset = src_offset;
+            cache[unique_count].key = cur_hdr.key;
+            cache[unique_count].latest_status = cur_hdr.status;
+            unique_count++;
+        } else {
+            has_overflow = FW_TRUE;
         }
 
         src_offset += cur_total;
     }
 
-    /* 4. Erase old source bank */
+    /* 4a. Copy live cached keys without inner scans */
+    for (fw_size_t i = 0; i < unique_count; ++i) {
+        if (cache[i].latest_status != FW_NVS_STATUS_VALID) {
+            continue;
+        }
+        fw_nvs_record_hdr_t cur_hdr;
+        FW_CHECK(flash_read(nvs, src_base + cache[i].latest_offset, &cur_hdr, sizeof(cur_hdr)));
+
+        uint32_t cur_total = sizeof(fw_nvs_record_hdr_t) + ALIGN_UP_4(cur_hdr.length);
+        if (dst_offset + cur_total > max_size) {
+            return FW_ERR_OUT_OF_MEMORY;
+        }
+
+        FW_CHECK(nvs_copy_record(nvs, src_base + cache[i].latest_offset, dst_base + dst_offset, cur_total));
+        dst_offset += cur_total;
+    }
+
+    /* 4b. Fallback pass only when more than 32 distinct keys exist in active bank */
+    if (has_overflow) {
+        src_offset = sizeof(fw_nvs_sector_hdr_t);
+        while (src_offset < nvs->write_offset) {
+            fw_nvs_record_hdr_t cur_hdr;
+            if (flash_read(nvs, src_base + src_offset, &cur_hdr, sizeof(cur_hdr)) != FW_OK) {
+                break;
+            }
+            if (cur_hdr.key == FW_NVS_KEY_EMPTY) {
+                break;
+            }
+
+            uint32_t cur_total = sizeof(fw_nvs_record_hdr_t) + ALIGN_UP_4(cur_hdr.length);
+            if (src_offset + cur_total > nvs->write_offset) {
+                break;
+            }
+
+            if (cur_hdr.status == FW_NVS_STATUS_VALID &&
+                nvs_cache_find(cache, unique_count, cur_hdr.key) < 0 &&
+                nvs_is_key_latest_after(nvs, src_base, src_offset + cur_total, cur_hdr.key)) {
+                if (dst_offset + cur_total > max_size) {
+                    return FW_ERR_OUT_OF_MEMORY;
+                }
+                FW_CHECK(nvs_copy_record(nvs, src_base + src_offset, dst_base + dst_offset, cur_total));
+                dst_offset += cur_total;
+            }
+
+            src_offset += cur_total;
+        }
+    }
+
+    /* 5. Erase old source bank */
     FW_CHECK(flash_erase(nvs, src_base));
 
-    /* 5. Switch active bank to newly compacted bank */
+    /* 6. Switch active bank to newly compacted bank */
     nvs->active_bank  = alt_bank;
     nvs->write_offset = dst_offset;
     nvs->sequence     = next_seq;
@@ -282,14 +351,20 @@ fw_status_t fw_nvs_write(fw_nvs_t *nvs, uint16_t key, fw_cspan_t data) {
 
     FW_CHECK(flash_write(nvs, addr, &hdr, sizeof(hdr)));
 
-    if (payload_len > 0) {
-        /* Zero padding bytes for 4-byte flash programming alignment */
-        uint8_t pad_buf[4] = { 0xFF, 0xFF, 0xFF, 0xFF };
-        FW_CHECK(flash_write(nvs, addr + sizeof(hdr), data.data, payload_len));
-
-        if (aligned_payload > payload_len) {
-            uint32_t pad_len = aligned_payload - payload_len;
-            FW_CHECK(flash_write(nvs, addr + sizeof(hdr) + payload_len, pad_buf, pad_len));
+    if (payload_len > 0U) {
+        if (data.data == FW_NULL) {
+            return FW_ERR_INVALID_ARG;
+        }
+        /* Write aligned prefix and pad any 1..3 trailing bytes into a 4-byte NOR flash word */
+        uint32_t aligned_down = payload_len & ~3U;
+        uint32_t rem = payload_len & 3U;
+        if (aligned_down > 0U) {
+            FW_CHECK(flash_write(nvs, addr + sizeof(hdr), data.data, aligned_down));
+        }
+        if (rem > 0U) {
+            uint8_t tail_word[4] = { 0xFF, 0xFF, 0xFF, 0xFF };
+            memcpy(tail_word, (const uint8_t*)data.data + aligned_down, rem);
+            FW_CHECK(flash_write(nvs, addr + sizeof(hdr) + aligned_down, tail_word, 4));
         }
     }
 
@@ -363,16 +438,36 @@ fw_status_t fw_nvs_read(fw_nvs_t *nvs, uint16_t key, fw_span_t out_data, fw_size
     return FW_OK;
 }
 
+static fw_bool_t nvs_has_valid_key(const fw_nvs_t *nvs, uint16_t key) {
+    uint32_t base = nvs->bank_addr[nvs->active_bank];
+    uint32_t offset = sizeof(fw_nvs_sector_hdr_t);
+    fw_bool_t found = FW_FALSE;
+
+    while (offset < nvs->write_offset) {
+        fw_nvs_record_hdr_t hdr;
+        if (flash_read(nvs, base + offset, &hdr, sizeof(hdr)) != FW_OK) {
+            break;
+        }
+        if (hdr.key == FW_NVS_KEY_EMPTY) {
+            break;
+        }
+
+        uint32_t rec_total = sizeof(fw_nvs_record_hdr_t) + ALIGN_UP_4(hdr.length);
+        if (hdr.key == key) {
+            found = (hdr.status == FW_NVS_STATUS_VALID) ? FW_TRUE : FW_FALSE;
+        }
+        offset += rec_total;
+    }
+
+    return found;
+}
+
 fw_status_t fw_nvs_delete(fw_nvs_t *nvs, uint16_t key) {
     if (nvs == FW_NULL || key == FW_NVS_KEY_EMPTY) {
         return FW_ERR_INVALID_ARG;
     }
 
-    /* Check if key currently exists */
-    uint8_t dummy[1];
-    fw_span_t dummy_span = FW_SPAN_FROM_ARRAY(dummy);
-    fw_size_t len = 0;
-    if (fw_nvs_read(nvs, key, dummy_span, &len) == FW_ERR_NOT_FOUND) {
+    if (!nvs_has_valid_key(nvs, key)) {
         return FW_ERR_NOT_FOUND;
     }
 
@@ -381,6 +476,9 @@ fw_status_t fw_nvs_delete(fw_nvs_t *nvs, uint16_t key) {
 
     if (nvs->write_offset + rec_total > nvs->flash->sector_size) {
         FW_CHECK(nvs_compact(nvs));
+        if (nvs->write_offset + rec_total > nvs->flash->sector_size) {
+            return FW_ERR_OUT_OF_MEMORY;
+        }
     }
 
     fw_nvs_record_hdr_t hdr;

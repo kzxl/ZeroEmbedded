@@ -73,10 +73,6 @@ static const fw_cmd_entry_t s_rpc_entries[] = {
 };
 static fw_cmd_table_t s_rpc_table;
 
-/* External mock injection helper from uart.c */
-extern void fw_uart_mock_inject_rx(fw_uart_t *uart, uint8_t byte);
-extern fw_bool_t fw_uart_mock_extract_tx(fw_uart_t *uart, uint8_t *out_byte);
-
 /* ========================================================================== */
 /* Cooperative Tasklet Handlers (Deferred Execution from ISR)                 */
 /* ========================================================================== */

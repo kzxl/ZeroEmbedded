@@ -9,8 +9,8 @@
  * host x86/x64 RDTSC hardware timestamp counter.
  */
 
-#include "../types.h"
-#include "../attributes.h"
+#include "zero/types.h"
+#include "zero/attributes.h"
 
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
 #include <intrin.h>
@@ -26,15 +26,17 @@ extern "C" {
  * On ARM Cortex-M: Configures CoreDebug->DEMCR and DWT->CTRL.
  */
 FW_INLINE void fw_dwt_init(void) {
-#if defined(__arm__) || defined(__thumb__)
-    /* CoreDebug_DEMCR_TRCENA_Msk = 0x01000000 */
-    volatile uint32_t *demcr = (volatile uint32_t*)0xE000EDFC;
-    volatile uint32_t *dwt_ctrl = (volatile uint32_t*)0xE0001000;
-    volatile uint32_t *dwt_cyccnt = (volatile uint32_t*)0xE0001004;
+#if (defined(__arm__) || defined(__thumb__)) && !defined(_WIN32) && !defined(__linux__) && !defined(__APPLE__)
+    /* CoreDebug_DEMCR_TRCENA_Msk = 0x01000000; unlock DWT->LAR for Cortex-M7 */
+    volatile uint32_t *demcr      = (volatile uint32_t*)0xE000EDFCU;
+    volatile uint32_t *dwt_ctrl   = (volatile uint32_t*)0xE0001000U;
+    volatile uint32_t *dwt_cyccnt = (volatile uint32_t*)0xE0001004U;
+    volatile uint32_t *dwt_lar    = (volatile uint32_t*)0xE0001FB0U;
 
-    *demcr |= 0x01000000;
-    *dwt_cyccnt = 0;
-    *dwt_ctrl |= 1; /* DWT_CTRL_CYCCNTENA_Msk */
+    *demcr |= 0x01000000U;
+    *dwt_lar = 0xC5ACCE55U;
+    *dwt_cyccnt = 0U;
+    *dwt_ctrl |= 1U; /* DWT_CTRL_CYCCNTENA_Msk */
 #endif
 }
 
@@ -42,8 +44,8 @@ FW_INLINE void fw_dwt_init(void) {
  * @brief Reads the current CPU hardware cycle counter.
  */
 FW_ALWAYS_INLINE uint32_t fw_dwt_get_cycles(void) {
-#if defined(__arm__) || defined(__thumb__)
-    volatile uint32_t *dwt_cyccnt = (volatile uint32_t*)0xE0001004;
+#if (defined(__arm__) || defined(__thumb__)) && !defined(_WIN32) && !defined(__linux__) && !defined(__APPLE__)
+    volatile uint32_t *dwt_cyccnt = (volatile uint32_t*)0xE0001004U;
     return *dwt_cyccnt;
 #elif defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
     return (uint32_t)__rdtsc();

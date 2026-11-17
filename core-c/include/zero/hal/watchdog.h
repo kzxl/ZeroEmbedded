@@ -21,8 +21,8 @@ typedef void (*fw_wdt_kick_fn_t)(void);
 typedef void (*fw_wdt_fault_fn_t)(uint32_t starving_mask);
 
 typedef struct {
-    uint32_t            registered_mask;  /*!< Bitmask of monitored tasks (1..32) */
-    uint32_t            reported_mask;    /*!< Bitmask of tasks that reported in current window */
+    volatile uint32_t   registered_mask;  /*!< Bitmask of monitored tasks (1..32) */
+    volatile uint32_t   reported_mask;    /*!< Bitmask of tasks that reported in current window */
     uint32_t            timeout_ms;       /*!< Supervision timeout window in milliseconds */
     uint32_t            last_kick_ms;     /*!< Monotonic timestamp of last hardware kick */
     fw_wdt_kick_fn_t    hw_kick_fn;       /*!< Hardware IWDG/WWDG refresh callback */
@@ -36,7 +36,7 @@ typedef struct {
  * @param timeout_ms Maximum time window (in ms) allowed between full task check-ins.
  * @param hw_kick_fn Function pointer to kick actual hardware watchdog (can be NULL for tests).
  * @param fault_fn Optional callback invoked if one or more tasks fail to report (can be NULL).
- * @return FW_OK on success, or FW_ERR_INVALID_PARAM if wdt is NULL or timeout_ms is 0.
+ * @return FW_OK on success, or FW_ERR_INVALID_ARG if wdt is NULL or timeout_ms is 0.
  */
 fw_status_t fw_wdt_init(fw_wdt_supervisor_t *wdt,
                         uint32_t timeout_ms,

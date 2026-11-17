@@ -6,12 +6,19 @@
 #include "zero/storage/ota.h"
 #include <string.h>
 
+/* IEEE 802.3 CRC32 4-bit nibble LUT (64 bytes Flash, 4x faster than bit-by-bit) */
+static const uint32_t s_crc32_nibble_lut[16] = {
+    0x00000000U, 0x1DB71064U, 0x3B6E20C8U, 0x26D930ACU,
+    0x76DC4190U, 0x6B6B51F4U, 0x4DB26158U, 0x5005713CU,
+    0xEDB88320U, 0xF00F9344U, 0xD6D6A3E8U, 0xCB61B38CU,
+    0x9B64C2B0U, 0x86D3D2D4U, 0xA00AE278U, 0xBDBDF21CU
+};
+
 static uint32_t crc32_step(uint32_t crc, const uint8_t *p, fw_size_t len) {
     while (len--) {
-        crc ^= *p++;
-        for (int i = 0; i < 8; ++i) {
-            crc = (crc >> 1) ^ (0xEDB88320U & (-(int32_t)(crc & 1)));
-        }
+        uint8_t b = *p++;
+        crc = (crc >> 4) ^ s_crc32_nibble_lut[(crc ^ b) & 0x0FU];
+        crc = (crc >> 4) ^ s_crc32_nibble_lut[(crc ^ (b >> 4)) & 0x0FU];
     }
     return crc;
 }
@@ -115,6 +122,12 @@ fw_status_t fw_ota_mark_pending_verify(fw_ota_t *ota) {
     }
 
     fw_app_desc_t desc = ota->current_desc;
+    if (desc.max_attempts > 0U && desc.boot_attempts >= desc.max_attempts) {
+        desc.state = FW_OTA_STATE_ROLLBACK;
+        FW_CHECK(fw_ota_set_desc(ota, &desc));
+        return FW_ERR_TIMEOUT;
+    }
+
     desc.state = FW_OTA_STATE_PENDING_VERIFY;
     desc.boot_attempts++;
 

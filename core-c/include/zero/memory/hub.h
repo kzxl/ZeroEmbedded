@@ -7,9 +7,9 @@
  * Inspired by Magic Lantern's multi-backend mem_allocator architecture.
  */
 
-#include "../types.h"
-#include "../result.h"
-#include "../attributes.h"
+#include "zero/types.h"
+#include "zero/result.h"
+#include "zero/attributes.h"
 #include "pool.h"
 #include "arena.h"
 

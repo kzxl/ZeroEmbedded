@@ -6,9 +6,9 @@
  * @brief Type-safe zero-cost GPIO abstraction for ZeroEmbedded.
  */
 
-#include "../types.h"
-#include "../result.h"
-#include "../attributes.h"
+#include "zero/types.h"
+#include "zero/result.h"
+#include "zero/attributes.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -66,23 +66,27 @@ typedef enum {
     FW_GPIO_SPEED_VERY_HIGH = 3
 } fw_gpio_speed_t;
 
-/** Packed 16-bit type-safe pin descriptor (Zero-allocation) */
+/** Packed 16-bit type-safe pin descriptor (Zero-allocation, ISO C11 bitfields) */
 typedef struct {
-    uint8_t port : 4;
-    uint8_t pin  : 4;
-    uint8_t mode : 4;
-    uint8_t pull : 2;
-    uint8_t speed: 2;
+    unsigned int port : 4;
+    unsigned int pin  : 4;
+    unsigned int mode : 4;
+    unsigned int pull : 2;
+    unsigned int speed: 2;
 } fw_gpio_t;
 
 #define FW_GPIO_PIN(port_id, pin_id) \
-    { (uint8_t)(port_id), (uint8_t)(pin_id), FW_GPIO_MODE_OUTPUT_PP, FW_GPIO_PULL_NONE, FW_GPIO_SPEED_HIGH }
+    { (unsigned int)(port_id), (unsigned int)(pin_id), (unsigned int)FW_GPIO_MODE_OUTPUT_PP, (unsigned int)FW_GPIO_PULL_NONE, (unsigned int)FW_GPIO_SPEED_HIGH }
 
 /** Common hardware-level function prototypes implemented by silicon BSP */
 fw_status_t fw_gpio_init(fw_gpio_t pin);
 void fw_gpio_write(fw_gpio_t pin, fw_bool_t state);
 fw_bool_t fw_gpio_read(fw_gpio_t pin);
 void fw_gpio_toggle(fw_gpio_t pin);
+
+/** Host Simulation & CI Mock Inspection Helpers */
+uint16_t fw_gpio_mock_get_port(fw_gpio_port_t port);
+void fw_gpio_mock_set_input(fw_gpio_port_t port, fw_gpio_pin_t pin, fw_bool_t state);
 
 #ifdef __cplusplus
 }

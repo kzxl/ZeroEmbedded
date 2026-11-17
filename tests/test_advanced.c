@@ -68,6 +68,7 @@ static fw_status_t test_dwt_cycles(void) {
 
 #define CMD_PING      0x10
 #define CMD_GET_INFO  0x20
+#define CMD_OVERSIZE  0x30
 
 static fw_status_t handle_ping(uint8_t seq, fw_cspan_t req, fw_span_t resp, fw_size_t *out_len) {
     (void)seq;
@@ -87,14 +88,23 @@ static fw_status_t handle_get_info(uint8_t seq, fw_cspan_t req, fw_span_t resp, 
     return FW_OK;
 }
 
+static fw_status_t handle_oversize(uint8_t seq, fw_cspan_t req, fw_span_t resp, fw_size_t *out_len) {
+    (void)seq;
+    (void)req;
+    (void)resp;
+    *out_len = ZEROWIRE_MAX_PAYLOAD + 10;
+    return FW_OK;
+}
+
 static fw_status_t test_rpc_dispatcher(void) {
     static const fw_cmd_entry_t s_cmds[] = {
         { CMD_PING,     0, handle_ping },
-        { CMD_GET_INFO, 2, handle_get_info } /* Requires at least 2 bytes payload */
+        { CMD_GET_INFO, 2, handle_get_info }, /* Requires at least 2 bytes payload */
+        { CMD_OVERSIZE, 0, handle_oversize }
     };
 
     fw_cmd_table_t table;
-    TEST_ASSERT(fw_cmd_table_init(&table, s_cmds, 2) == FW_OK, "Init command table ok");
+    TEST_ASSERT(fw_cmd_table_init(&table, s_cmds, 3) == FW_OK, "Init command table ok");
 
     /* 3.1 Test Valid PING request */
     fw_zerowire_frame_t req;
@@ -120,6 +130,13 @@ static fw_status_t test_rpc_dispatcher(void) {
     fw_zerowire_frame_t short_req = { 2, CMD_GET_INFO, 1, {0} }; /* min is 2 */
     TEST_ASSERT(fw_cmd_dispatch(&table, &short_req, &resp, &has_resp) == FW_ERR_INVALID_ARG,
                 "Short payload rejected");
+
+    /* 3.3b Test Oversize Response Payload rejection */
+    fw_zerowire_frame_t oversize_req = { 3, CMD_OVERSIZE, 0, {0} };
+    has_resp = FW_FALSE;
+    TEST_ASSERT(fw_cmd_dispatch(&table, &oversize_req, &resp, &has_resp) == FW_ERR_BUFFER_OVERFLOW,
+                "Oversize response payload rejected");
+    TEST_ASSERT(has_resp == FW_FALSE, "Oversize failure does not mark response ready");
 
     /* 3.4 Test Full Stream Processing: Noise + Valid PING Frame -> Encoded Response */
     uint8_t ping_frame_raw[32];

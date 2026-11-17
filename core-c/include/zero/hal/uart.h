@@ -6,11 +6,11 @@
  * @brief Asynchronous interrupt & DMA-driven UART abstraction for ZeroEmbedded.
  */
 
-#include "../types.h"
-#include "../result.h"
-#include "../span.h"
-#include "../sync/spsc.h"
-#include "../attributes.h"
+#include "zero/types.h"
+#include "zero/result.h"
+#include "zero/span.h"
+#include "zero/sync/spsc.h"
+#include "zero/attributes.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,6 +47,10 @@ fw_size_t   fw_uart_read(fw_uart_t *uart, fw_span_t buffer);
 
 /** Called inside UART IRQ handler to service interrupts */
 FW_ISR void fw_uart_irq_handler(fw_uart_t *uart);
+
+/** Host Simulation & Loopback Helpers */
+void fw_uart_mock_inject_rx(fw_uart_t *uart, uint8_t byte);
+fw_bool_t fw_uart_mock_extract_tx(fw_uart_t *uart, uint8_t *out_byte);
 
 #ifdef __cplusplus
 }

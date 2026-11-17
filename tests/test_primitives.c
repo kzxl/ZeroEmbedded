@@ -5,6 +5,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <assert.h>
 #include "zero/zero.h"
 

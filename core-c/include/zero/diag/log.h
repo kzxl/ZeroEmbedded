@@ -61,29 +61,35 @@ void fw_log_post_fast(uint8_t level, const char *tag, const char *fmt, uintptr_t
  */
 fw_size_t fw_log_flush(fw_size_t max_entries);
 
-/* Compile-time level stripped logging macros */
+/* Compile-time level stripped logging macros (ISO C11 & MSVC compatible) */
+#define _FW_LOG_INVOKE(fn, args) fn args
+#define _FW_LOG_CALL(level, tag, fmt, arg1, arg2, ...) \
+    fw_log_post_fast((level), (tag), (fmt), (uintptr_t)(arg1), (uintptr_t)(arg2))
+#define _FW_LOG_POST(level, tag, ...) \
+    _FW_LOG_INVOKE(_FW_LOG_CALL, ((level), (tag), __VA_ARGS__, 0, 0, 0))
+
 #if (FW_LOG_LEVEL >= FW_LOG_LEVEL_ERROR)
-#define FW_LOG_E(tag, fmt, ...) fw_log_post_fast(FW_LOG_LEVEL_ERROR, tag, fmt, (uintptr_t)(0, ##__VA_ARGS__))
+#define FW_LOG_E(tag, ...) _FW_LOG_POST(FW_LOG_LEVEL_ERROR, tag, __VA_ARGS__)
 #else
-#define FW_LOG_E(tag, fmt, ...) ((void)0)
+#define FW_LOG_E(tag, ...) ((void)0)
 #endif
 
 #if (FW_LOG_LEVEL >= FW_LOG_LEVEL_WARN)
-#define FW_LOG_W(tag, fmt, ...) fw_log_post_fast(FW_LOG_LEVEL_WARN, tag, fmt, (uintptr_t)(0, ##__VA_ARGS__))
+#define FW_LOG_W(tag, ...) _FW_LOG_POST(FW_LOG_LEVEL_WARN, tag, __VA_ARGS__)
 #else
-#define FW_LOG_W(tag, fmt, ...) ((void)0)
+#define FW_LOG_W(tag, ...) ((void)0)
 #endif
 
 #if (FW_LOG_LEVEL >= FW_LOG_LEVEL_INFO)
-#define FW_LOG_I(tag, fmt, ...) fw_log_post_fast(FW_LOG_LEVEL_INFO, tag, fmt, (uintptr_t)(0, ##__VA_ARGS__))
+#define FW_LOG_I(tag, ...) _FW_LOG_POST(FW_LOG_LEVEL_INFO, tag, __VA_ARGS__)
 #else
-#define FW_LOG_I(tag, fmt, ...) ((void)0)
+#define FW_LOG_I(tag, ...) ((void)0)
 #endif
 
 #if (FW_LOG_LEVEL >= FW_LOG_LEVEL_DEBUG)
-#define FW_LOG_D(tag, fmt, ...) fw_log_post_fast(FW_LOG_LEVEL_DEBUG, tag, fmt, (uintptr_t)(0, ##__VA_ARGS__))
+#define FW_LOG_D(tag, ...) _FW_LOG_POST(FW_LOG_LEVEL_DEBUG, tag, __VA_ARGS__)
 #else
-#define FW_LOG_D(tag, fmt, ...) ((void)0)
+#define FW_LOG_D(tag, ...) ((void)0)
 #endif
 
 #ifdef __cplusplus

@@ -5,6 +5,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <assert.h>
 #include "zero/zero.h"
 
@@ -29,6 +32,10 @@ static fw_status_t mock_flash_read(void *ctx, uint32_t addr, void *buf, fw_size_
 static fw_status_t mock_flash_write(void *ctx, uint32_t addr, const void *buf, fw_size_t len) {
     (void)ctx;
     if (addr + len > TOTAL_FLASH_SIZE) {
+        return FW_ERR_INVALID_ARG;
+    }
+    /* Strict 4-byte word alignment required by real NOR Flash controllers (STM32/ESP32) */
+    if ((addr % 4U) != 0U || (len % 4U) != 0U) {
         return FW_ERR_INVALID_ARG;
     }
 
@@ -126,6 +133,12 @@ static void test_nvs_basic_crud(void) {
     assert(st == FW_OK);
     assert(read_calib == calib_val);
 
+    /* 6. Verify NVS stats */
+    fw_size_t used_bytes = 0;
+    fw_size_t free_bytes = 0;
+    assert(fw_nvs_get_stats(&nvs, &used_bytes, &free_bytes) == FW_OK);
+    assert(used_bytes > 0 && used_bytes + free_bytes == TEST_SECTOR_SIZE);
+
     printf("  -> NVS basic CRUD passed!\n");
 }
 
@@ -141,13 +154,13 @@ static void test_nvs_compaction_and_wear_leveling(void) {
     const char *device_name = "EDGE_NODE_01";
     assert(fw_nvs_write(&nvs, 0x0001, fw_cspan_make(device_name, strlen(device_name))) == FW_OK);
 
-    /* Write 60 updates to Key 0x0002 (counter) into a 512-byte sector.
-     * Each record is ~16 bytes. 60 updates * 16 bytes = 960 bytes,
+    /* Write 90 updates to Key 0x0002 (counter) into a 512-byte sector.
+     * Each record is 12 bytes (8B header + 4B payload). 90 updates * 12 bytes = 1080 bytes,
      * which MUST trigger multiple automatic ping-pong compactions! */
     uint8_t prev_bank = nvs.active_bank;
     uint32_t bank_switches = 0;
 
-    for (uint32_t i = 1; i <= 60; ++i) {
+    for (uint32_t i = 1; i <= 90; ++i) {
         st = fw_nvs_write(&nvs, 0x0002, fw_cspan_make(&i, sizeof(i)));
         assert(st == FW_OK);
 
@@ -167,11 +180,11 @@ static void test_nvs_compaction_and_wear_leveling(void) {
     assert(len == strlen(device_name));
     assert(memcmp(name_buf, device_name, len) == 0);
 
-    /* Verify Key 0x0002 has the latest value (60) */
+    /* Verify Key 0x0002 has the latest value (90) */
     uint32_t final_val = 0;
     st = fw_nvs_read(&nvs, 0x0002, fw_span_make(&final_val, sizeof(final_val)), &len);
     assert(st == FW_OK);
-    assert(final_val == 60);
+    assert(final_val == 90);
 
     printf("  -> NVS compaction passed! (Bank switches: %u, latest sequence: %u)\n",
         bank_switches, nvs.sequence);
@@ -200,13 +213,19 @@ static void test_nvs_reboot_and_corruption_recovery(void) {
     assert(fw_nvs_read(&nvs, 0x0003, fw_span_make(&read_secret, sizeof(read_secret)), &len) == FW_OK);
     assert(read_secret == secret);
 
-    /* Find location of secret in virtual flash and corrupt 1 bit */
-    for (uint32_t i = 0; i < TEST_SECTOR_SIZE * 2; ++i) {
-        if (s_virtual_flash[i] == 0xCA && s_virtual_flash[i+1] == 0xFE) {
-            s_virtual_flash[i] = 0x00; /* Corrupt data byte */
+    /* Find location of secret in active bank of virtual flash and corrupt 1 bit */
+    uint32_t active_base = nvs.bank_addr[nvs.active_bank];
+    fw_bool_t corrupted = FW_FALSE;
+    for (uint32_t i = active_base + sizeof(fw_nvs_sector_hdr_t);
+         i + sizeof(secret) <= active_base + nvs.write_offset;
+         ++i) {
+        if (memcmp(&s_virtual_flash[i], &secret, sizeof(secret)) == 0) {
+            s_virtual_flash[i] ^= 0xFFU; /* Corrupt data byte */
+            corrupted = FW_TRUE;
             break;
         }
     }
+    assert(corrupted == FW_TRUE);
 
     /* Reading now must return FW_ERR_CORRUPTED due to CRC16 mismatch */
     st = fw_nvs_read(&nvs, 0x0003, fw_span_make(&read_secret, sizeof(read_secret)), &len);

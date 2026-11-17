@@ -7,9 +7,9 @@
  * Inspired by Magic Lantern's tskmon execution analyzer.
  */
 
-#include "../types.h"
-#include "../result.h"
-#include "../attributes.h"
+#include "zero/types.h"
+#include "zero/result.h"
+#include "zero/attributes.h"
 
 #ifdef __cplusplus
 extern "C" {

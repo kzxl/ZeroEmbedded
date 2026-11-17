@@ -6,8 +6,8 @@
  * @brief High-precision hardware timer and tick counters for ZeroEmbedded.
  */
 
-#include "../types.h"
-#include "../attributes.h"
+#include "zero/types.h"
+#include "zero/attributes.h"
 
 #ifdef __cplusplus
 extern "C" {

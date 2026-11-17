@@ -10,6 +10,7 @@
 
 #include "zero/types.h"
 #include "zero/result.h"
+#include "zero/assert.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,6 +51,8 @@ typedef struct {
     uint32_t bfar;          /*!< BusFault Address Register */
     uint32_t checksum;      /*!< Checksum verifying dump validity */
 } fw_crash_dump_t;
+
+FW_STATIC_ASSERT(sizeof(fw_crash_dump_t) == 64, "fw_crash_dump_t must be 64 bytes");
 
 /**
  * @brief Initializes the crash dump subsystem with a designated retention RAM buffer.

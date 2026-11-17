@@ -5,6 +5,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <assert.h>
 #include "zero/zero.h"
 
@@ -52,6 +55,21 @@ static void test_crash_dump_diagnostics(void) {
     assert(strstr(report, "Divide-by-Zero") != FW_NULL);
     assert(strstr(report, "0x08001A42") != FW_NULL);
     assert(strstr(report, "45678 ms") != FW_NULL);
+
+    /* 4b. Verify truncation safety when all CFSR flags are set and with tiny output buffer */
+    fw_crash_dump_t all_faults = retrieved;
+    all_faults.cfsr = 0xFFFFFFFFU;
+    all_faults.bfar = 0xE000ED38U;
+    all_faults.mmar = 0x20001000U;
+    char full_report[1024];
+    fw_size_t full_written = fw_crash_dump_format_report(&all_faults, full_report, sizeof(full_report));
+    assert(full_written > 0 && full_written < sizeof(full_report));
+    assert(strstr(full_report, "Divide-by-Zero") != FW_NULL);
+
+    char tiny_report[24];
+    fw_size_t tiny_written = fw_crash_dump_format_report(&all_faults, tiny_report, sizeof(tiny_report));
+    assert(tiny_written == sizeof(tiny_report) - 1);
+    assert(tiny_report[sizeof(tiny_report) - 1] == '\0');
 
     /* 5. Verify corruption check */
     s_mock_retention_ram[10] ^= 0xFF; /* Corrupt data */
@@ -172,6 +190,15 @@ static void test_ota_lifecycle(void) {
     /* 7. Corrupted image rejection test */
     s_ota_flash[0x0400 + 10] ^= 0x01; /* Corrupt 1 byte in flash */
     assert(fw_ota_verify_image(&s_ota_flash_drv, 0x0400, &new_desc) == FW_ERR_CORRUPTED);
+
+    /* 8. Boot attempt limit enforcement -> forced ROLLBACK */
+    assert(fw_ota_set_desc(&ota, &new_desc) == FW_OK);
+    assert(fw_ota_mark_pending_verify(&ota) == FW_OK); /* Attempt 1 */
+    assert(fw_ota_mark_pending_verify(&ota) == FW_OK); /* Attempt 2 */
+    assert(fw_ota_mark_pending_verify(&ota) == FW_OK); /* Attempt 3 */
+    assert(fw_ota_mark_pending_verify(&ota) == FW_ERR_TIMEOUT); /* Exceeds max_attempts=3 */
+    assert(fw_ota_get_desc(&ota, &desc) == FW_OK);
+    assert(desc.state == FW_OTA_STATE_ROLLBACK);
 
     printf("  -> OTA lifecycle passed! (States: DOWNLOADED -> PENDING -> CONFIRMED -> ROLLBACK)\n");
 }

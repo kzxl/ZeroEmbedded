@@ -8,9 +8,9 @@
  * Implements deterministic Request-Response routing without heap allocation.
  */
 
-#include "../types.h"
-#include "../result.h"
-#include "../span.h"
+#include "zero/types.h"
+#include "zero/result.h"
+#include "zero/span.h"
 #include "zerowire.h"
 
 #ifdef __cplusplus

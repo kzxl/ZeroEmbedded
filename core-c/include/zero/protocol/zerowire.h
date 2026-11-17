@@ -14,9 +14,9 @@
  * [N+1..N+2] CRC16-CCITT (uint16_t Little-Endian)
  */
 
-#include "../types.h"
-#include "../result.h"
-#include "../span.h"
+#include "zero/types.h"
+#include "zero/result.h"
+#include "zero/span.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,6 +34,9 @@ typedef struct {
     uint16_t  length;
     uint8_t   payload[ZEROWIRE_MAX_PAYLOAD];
 } fw_zerowire_frame_t;
+
+/** Incrementally updates CRC16-CCITT (poly 0x1021) using a 256-entry LUT */
+uint16_t fw_crc16_ccitt_update(uint16_t crc, const void *data, fw_size_t length);
 
 /** Calculates CRC16-CCITT (poly 0x1021, init 0xFFFF) */
 uint16_t fw_crc16_ccitt(const void *data, fw_size_t length);

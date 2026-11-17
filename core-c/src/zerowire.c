@@ -36,15 +36,19 @@ static const uint16_t s_crc16_table[256] = {
     0x6E17, 0x7E36, 0x4E55, 0x5E74, 0x2E93, 0x3EB2, 0x0ED1, 0x1EF0
 };
 
-uint16_t fw_crc16_ccitt(const void *data, fw_size_t length) {
-    if (data == FW_NULL || length == 0) return 0;
+uint16_t fw_crc16_ccitt_update(uint16_t crc, const void *data, fw_size_t length) {
+    if (data == FW_NULL || length == 0) return crc;
     const uint8_t *bytes = (const uint8_t*)data;
-    uint16_t crc = 0xFFFF;
 
     for (fw_size_t i = 0; i < length; ++i) {
         crc = (uint16_t)((crc << 8) ^ s_crc16_table[((crc >> 8) ^ bytes[i]) & 0xFF]);
     }
     return crc;
+}
+
+uint16_t fw_crc16_ccitt(const void *data, fw_size_t length) {
+    if (data == FW_NULL || length == 0) return 0;
+    return fw_crc16_ccitt_update(0xFFFF, data, length);
 }
 
 fw_size_t fw_zerowire_encode(const fw_zerowire_frame_t *frame, fw_span_t out_buf) {

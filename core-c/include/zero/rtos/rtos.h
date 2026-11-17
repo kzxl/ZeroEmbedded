@@ -6,9 +6,9 @@
  * @brief Unified RTOS abstraction layer for FreeRTOS, Zephyr, and Baremetal.
  */
 
-#include "../types.h"
-#include "../result.h"
-#include "../attributes.h"
+#include "zero/types.h"
+#include "zero/result.h"
+#include "zero/attributes.h"
 
 #ifdef __cplusplus
 extern "C" {
